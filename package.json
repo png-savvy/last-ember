@@ -1,0 +1,19 @@
+{
+  "name": "zombie_defense",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/bot.js && node test/server-smoke.js && node test/autosave.js",
+    "start": "node run.js",
+    "balance": "node test/earnings.js",
+    "turrets": "node test/turrets.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Last Ember - couch co-op zombie defense with phones as controllers",
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "ws": "^8.22.2"
+  }
+}

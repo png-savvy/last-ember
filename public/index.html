@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Ember</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf1; font-family: "Segoe UI", system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px; box-sizing: border-box; text-align: center; }
+  h1 { margin: 0; font: 900 44px Impact, "Arial Black", sans-serif; letter-spacing: 0.06em; color: #ffb54a; }
+  a { display: block; width: min(340px, 86vw); padding: 15px; border-radius: 12px; font-weight: 800; font-size: 18px; text-decoration: none; color: #fff; background: #b3421e; border: 2px solid #ff7a3c; }
+  a.alt { background: #1c212b; border-color: #3a4352; }
+  p { margin: 0; color: #96a0ac; font-size: 14px; max-width: 420px; }
+</style>
+<script>
+  // Touch devices go straight to the player view; desktops to the big-screen view. Both have a main menu.
+  try {
+    var coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+    location.replace(coarse ? '/pad' : '/screen');
+  } catch (e) { /* show the links below */ }
+</script>
+</head>
+<body>
+  <h1>LAST EMBER</h1>
+  <a href="/pad">Play on this device</a>
+  <a class="alt" href="/screen">Use as a shared big screen</a>
+  <a class="alt" href="/sounds">Sound test (gun sounds and music)</a>
+  <p>Any device can start a game. A big screen is optional.</p>
+</body>
+</html>

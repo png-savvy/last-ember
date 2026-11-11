@@ -1,0 +1,51 @@
+/* Shop / build menu - shared by phone controller and host overlay */
+.shop { display: flex; flex-direction: column; min-height: 0; color: #e8ecf1; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+.shop-tabs { display: flex; gap: 6px; padding: 0 0 8px; flex: none; }
+.shop-tabs button { flex: 1; padding: 10px 6px; font-size: 15px; font-weight: 700; color: #aeb6c0; background: #1a1f28; border: 1px solid #2c333f; border-radius: 9px; }
+.shop-tabs button.on { color: #14100a; background: #ffb54a; border-color: #ffb54a; }
+.shop-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 8px; align-content: start; padding-bottom: 10px; }
+.shop .hint { grid-column: 1 / -1; font-size: 13px; color: #96a0ac; }
+.shop .grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.shop .card { background: #161a22; border: 1px solid #2a313c; border-radius: 10px; padding: 9px 10px; min-width: 0; display: flex; flex-direction: column; }
+.shop .card.owned { border-color: #3d5a45; }
+.shop .card.cur { border-color: #ffb54a; }
+.shop .ctop { display: flex; align-items: center; gap: 8px; font-size: 15px; min-width: 0; }
+.shop .ctop b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shop .badge { margin-left: auto; font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 5px; background: #3a3222; color: #ffb54a; white-space: nowrap; }
+.shop .stats { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 5px; }
+.shop .stats span { font-size: 11.5px; font-weight: 700; color: #aeb6c0; background: #20262f; border-radius: 5px; padding: 2px 6px; white-space: nowrap; }
+.shop .ctop .tag { margin-left: auto; font-size: 11.5px; color: #96a0ac; white-space: nowrap; }
+.shop .cdesc { font-size: 12.5px; color: #96a0ac; margin: 5px 0 8px; flex: 1; }
+.shop .crow { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
+.shop .sbtn { min-width: 0; padding: 7px 5px; font-size: 13px; font-weight: 700; line-height: 1.2; color: #e8ecf1; background: #262d39; border: 1px solid #3a4352; border-radius: 8px; white-space: normal; overflow-wrap: anywhere; }
+.shop .sbtn .cost { display: block; margin: 2px 0 0; font-size: 12.5px; }
+.shop .cost.sub { color: #96a0ac; font-weight: 600; }
+.shop .sbtn.primary { background: #2f6b3c; border-color: #46995a; }
+.shop .sbtn.on { background: #3a3222; border-color: #ffb54a; color: #ffb54a; }
+.shop .sbtn:disabled { opacity: 0.55; }
+.shop .sbtn.cant { opacity: 0.5; }
+.shop .sbtn.cant .cost, .shop .tile.cant .cost { color: #ff7a6e; }
+.shop .sbtn small { font-weight: 600; color: #96a0ac; }
+.shop .cost { color: #ffd23f; margin-left: 6px; }
+.shop .pips { display: inline-flex; gap: 3px; }
+.shop .pips i { width: 9px; height: 9px; border-radius: 2px; background: #2c333f; }
+.shop .pips i.on { background: #ffb54a; }
+.shop .tile { text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; padding: 10px; color: #e8ecf1; background: #161a22; border: 1px solid #2a313c; border-radius: 10px; font-size: 14.5px; }
+.shop .tile small { grid-column: 1 / -1; font-size: 12px; color: #96a0ac; }
+.shop .tile.on { border-color: #7fe08f; background: #18251c; }
+.shop .tile.tool { border-style: dashed; }
+.shop .tile.cant { opacity: 0.55; }
+.shop button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.shop button:active:not(:disabled) { transform: scale(0.97); }
+.shop .new, .shop .lots { font-size: 10.5px; font-weight: 800; padding: 2px 6px; border-radius: 5px; }
+.shop .new { background: #5a1a14; color: #ff8a7e; }
+.shop .lots { background: #4a3c10; color: #ffd23f; }
+.shop .stats .mnt { color: #ffb54a; }
+.shop .armbox { grid-column: 1 / -1; background: #1a1712; border: 1px solid #5a4a2a; border-radius: 10px; padding: 9px 10px; }
+.shop .armtitle { font-size: 13px; font-weight: 800; color: #ffb54a; letter-spacing: 0.05em; }
+.shop .hint b { color: #e8ecf1; }
+
+.shop .sechead { grid-column: 1 / -1; font-size: 13px; font-weight: 800; color: #ffb54a; letter-spacing: 0.05em; margin-top: 2px; }
+.shop .burnbox { margin-top: 7px; padding: 7px 9px; border-radius: 8px; background: rgba(255,110,40,0.1); border: 1px solid rgba(255,122,60,0.45); color: #f0d6c0; }
+.shop .burnbox b { color: #ffb070; }
+.shop .tcard .cdesc { flex: 1; }

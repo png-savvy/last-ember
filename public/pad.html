@@ -1,0 +1,1252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d12">
+<title>Last Ember - Controller</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0d12%27/%3E%3Cpath d=%27M16 4c2 6 8 8 8 15a8 8 0 0 1-16 0c0-4 3-5 4-9 2 2 3 3 4-6z%27 fill=%27%23ff8a2c%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/shop.css">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf1; overflow: hidden; overscroll-behavior: none;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
+  .screen { position: fixed; inset: 0; display: none; }
+  .screen.show { display: flex; }
+  .pad-safe { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  canvas#view { position: fixed; inset: 0; display: none; }
+  body.gameview.playing canvas#view { display: block; }
+  .rlayer { display: none !important; }
+  body.gameview.playing .rlayer { display: block !important; }
+
+  /* join */
+  #join { flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 14px; touch-action: auto; overflow-y: auto;
+    background: radial-gradient(ellipse at 50% 40%, #2a1608 0%, #0b0d12 70%); }
+  #join h1 { margin: 0; font: 900 40px Impact, "Arial Black", sans-serif; letter-spacing: 0.06em; color: #ffb54a; text-shadow: 0 0 30px rgba(255,120,30,0.5); }
+  #join p { margin: 0; color: #a9b2bd; text-align: center; font-size: 13px; }
+  #name { width: min(340px, 80vw); padding: 12px; font-size: 19px; font-weight: 700; text-align: center; color: #fff; background: #161a22;
+    border: 2px solid #3a4352; border-radius: 12px; outline: none; -webkit-user-select: text; user-select: text; }
+  #name:focus { border-color: #ffb54a; }
+  #overCover .obtns { display: flex; gap: 8px; width: min(340px, 80vw); }
+  #overCover .obtns .big { flex: 1; width: auto; font-size: 14px; padding: 11px 6px; }
+  .big.alt { background: #1f2b3a; border-color: #4fb4ff; }
+  #overBar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); display: none; gap: 6px; z-index: 25; }
+  #overBar.show { display: flex; }
+  #overBar button { padding: 9px 12px; font-weight: 800; font-size: 13px; color: #fff; background: rgba(20,26,36,0.92); border: 1px solid #ff5a4f; border-radius: 10px; }
+  #replayTag { position: fixed; top: 56px; left: 50%; transform: translateX(-50%); display: none; padding: 4px 12px 6px; background: rgba(0,0,0,0.7); border-radius: 8px; color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 1px; z-index: 25; pointer-events: none; text-align: center; }
+  #replayTag.show { display: block; }
+  #replayTag .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff3a2a; margin-right: 6px; }
+  #replayTag .rbar { margin-top: 4px; height: 3px; width: 110px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; }
+  #replayTag .rbar i { display: block; height: 100%; width: 0; background: #ff5a4f; }
+  .big { width: min(340px, 80vw); padding: 14px; font-size: 20px; font-weight: 800; color: #fff; background: #b3421e; border: 2px solid #ff7a3c; border-radius: 12px; }
+  .big:active { transform: scale(0.97); }
+  .seg { display: flex; gap: 8px; width: min(340px, 80vw); }
+  .seg button { flex: 1; padding: 9px 6px; font-size: 13.5px; font-weight: 800; color: #aeb6c0; background: #161a22; border: 2px solid #3a4352; border-radius: 10px; }
+  .seg button small { display: block; font-weight: 600; font-size: 11px; color: #7d8794; }
+  .seg button.on { color: #ffb54a; border-color: #ffb54a; background: #2a2416; }
+  .seg.wrap { flex-wrap: wrap; }
+  .seg.wrap button { flex: 1 1 40%; }
+  .seg.wrap button.small { flex: 1 1 30%; color: #9fb0c4; font-size: 12px; }
+  .sdesc { margin: 0; width: min(340px, 80vw); font-size: 12px; color: #96a0ac; white-space: pre-line; text-align: left; }
+
+  /* play */
+  #play { flex-direction: column; }
+  #bar { flex: none; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px; background: #11141b; border-bottom: 1px solid #262d39; font-weight: 700; font-size: 15px; position: relative; z-index: 30; }
+  body.gameview #bar { background: rgba(10,12,17,0.72); border-bottom-color: transparent; }
+  #dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+  #pname { max-width: 16vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hpwrap { flex: 1; max-width: 24vw; height: 14px; background: #262d39; border-radius: 7px; overflow: hidden; position: relative; }
+  #hp { height: 100%; width: 100%; background: #6ee36a; transition: width 0.15s; }
+  #hptxt { position: absolute; inset: 0; text-align: center; font-size: 11px; line-height: 14px; color: #fff; text-shadow: 0 1px 2px #000; }
+  #money { color: #ffd23f; font-size: 17px; }
+  #status { margin-left: auto; color: #c2cad4; font-size: 13px; white-space: nowrap; }
+  #gearBtn { height: 34px; padding: 0 12px; font-size: 13px; font-weight: 800; color: #e8ecf1; background: #262d39; border: 1px solid #3a4352; border-radius: 9px; }
+  #field { flex: 1; position: relative; min-height: 0; }
+  #tap { position: absolute; inset: 0; z-index: 1; display: none; }
+  body.gameview.building #tap { display: block; }
+  .zone { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 2; }
+  #zl { left: 0; } #zr { right: 0; }
+  body.gameview.building #zr { display: none; }
+  body.gameview.building #zl { top: auto; width: 190px; height: 190px; }
+  .zone .lbl { position: absolute; bottom: 8px; width: 100%; text-align: center; font-size: 12px; letter-spacing: 0.14em; color: #48515e; font-weight: 700; pointer-events: none; }
+  body.gameview .zone .lbl { display: none; }
+  .ring { position: absolute; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%; border: 2px solid #2c333f; background: rgba(255,255,255,0.02); pointer-events: none; }
+  body.gameview .ring { border-color: rgba(255,255,255,0.22); background: rgba(0,0,0,0.12); }
+  .ring.active { border-color: #6a7686; }
+  #zr .ring.fire { border-color: #ff7a3c; box-shadow: 0 0 22px rgba(255,120,60,0.35) inset; }
+  .knob { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; background: #3a4352; border: 2px solid #56616f; pointer-events: none; }
+  body.gameview .knob { opacity: 0.6; }
+  #zr .knob { background: #5a2c1c; border-color: #ff7a3c; }
+  .btns { position: absolute; top: 8px; display: flex; gap: 8px; z-index: 5; }
+  #bl { left: 10px; } #br { right: 10px; }
+  .pbtn { min-width: 78px; height: 50px; padding: 0 10px; font-size: 14px; font-weight: 800; letter-spacing: 0.04em; color: #e8ecf1; background: #1c212b; border: 2px solid #3a4352; border-radius: 12px; }
+  body.gameview .pbtn { background: rgba(20,24,32,0.82); }
+  .pbtn:active { background: #2c3340; transform: scale(0.96); }
+  .pbtn small { display: block; font-size: 10.5px; font-weight: 600; color: #96a0ac; letter-spacing: 0; }
+  #shopBtn { border-color: #ffb54a; color: #ffb54a; }
+  #buildBtn { border-color: #7fe08f; color: #7fe08f; }
+  #readyBtn { border-color: #46995a; color: #7fe08f; display: none; }
+  #readyBtn.on { background: #2f6b3c; color: #fff; }
+  #weapon { position: absolute; top: 64px; right: 10px; text-align: right; font-weight: 800; font-size: 15px; pointer-events: none; z-index: 4; text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+  #weapon span { display: block; font-size: 22px; color: #fff; }
+  #weapon span.low { color: #ff5a4f; }
+  #mini { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 136px; height: 77px; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; background: rgba(0,0,0,0.55); z-index: 3; pointer-events: none; display: none; }
+  body.gameview #mini { display: block; }
+  #buildbar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: none; align-items: center; gap: 8px; z-index: 6;
+    padding: 8px; background: rgba(17,20,27,0.95); border: 2px solid #7fe08f; border-radius: 14px; }
+  #buildbar.show { display: flex; }
+  #buildbar b { padding: 0 8px; font-size: 14px; white-space: nowrap; }
+  #buildbar b small { display: block; color: #ffd23f; font-size: 13px; }
+  #placeBtn { height: 58px; min-width: 120px; font-size: 19px; font-weight: 900; color: #06210d; background: #7fe08f; border: 0; border-radius: 10px; }
+  #placeBtn:active { transform: scale(0.95); background: #a8f0b4; }
+  #doneBtn, #qDone { height: 58px; padding: 0 14px; font-size: 14px; font-weight: 800; color: #e8ecf1; background: #262d39; border: 1px solid #3a4352; border-radius: 10px; }
+  /* quick build bar (game view) */
+  #qbar { position: absolute; left: 196px; right: 8px; bottom: 8px; display: none; flex-direction: column; gap: 4px; z-index: 6; }
+  #qbar.show { display: flex; }
+  #qhint { font-size: 12.5px; font-weight: 700; color: #d7f5dc; text-shadow: 0 1px 3px #000, 0 0 6px #000; padding-left: 4px; }
+  #qrow { display: flex; gap: 6px; align-items: stretch; }
+  #qitems { flex: 1; display: flex; gap: 6px; overflow-x: auto; touch-action: pan-x; padding: 6px; background: rgba(13,16,22,0.9); border: 2px solid #7fe08f; border-radius: 12px; scrollbar-width: none; }
+  #qitems::-webkit-scrollbar { display: none; }
+  .qi { flex: none; width: 62px; height: 58px; padding: 3px 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: #e8ecf1; background: #1c212b; border: 2px solid #3a4352; border-radius: 9px; font-size: 10.5px; font-weight: 700; line-height: 1.1; }
+  .qi img { width: 30px; height: 30px; pointer-events: none; }
+  .qi i { font-style: normal; color: #ffd23f; }
+  .qi.on { border-color: #7fe08f; background: #1d3223; }
+  .qi.cant { opacity: 0.5; }
+  .qi.tool { border-style: dashed; font-size: 12px; }
+  .qsep { flex: none; align-self: stretch; display: flex; align-items: center; padding: 0 3px; writing-mode: vertical-rl; transform: rotate(180deg);
+    font-size: 10.5px; font-weight: 900; letter-spacing: 0.18em; color: #ffb54a; border-left: 2px solid #5a4a2a; }
+  #hurt { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 70px 20px rgba(255,30,20,0.75); opacity: 0; transition: opacity 0.35s; z-index: 7; }
+  #hurt.on { opacity: 1; transition: none; }
+
+  /* overlays inside play */
+  .cover { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; text-align: center; z-index: 20; background: rgba(8,9,13,0.93); }
+  .cover.show { display: flex; }
+  .cover h2 { margin: 0; font: 900 30px Impact, "Arial Black", sans-serif; letter-spacing: 0.05em; color: #ffb54a; }
+  .cover p { margin: 0; color: #a9b2bd; font-size: 15px; max-width: 460px; }
+  #downCover { background: rgba(60,6,4,0.6); z-index: 15; pointer-events: none; }
+  #downCover h2 { color: #ff5a4f; }
+  #pterm { display: none; width: min(460px, 90vw); flex: none; background: rgba(4,8,4,0.95); border: 1px solid #2f6a2f; border-radius: 8px; font: 12.5px/1.45 Consolas, "Courier New", monospace; color: #8dff8d; text-align: left; }
+  #pterm.show { display: block; }
+  #ptermOut { max-height: 30vh; overflow-y: auto; padding: 6px 9px; white-space: pre-wrap; }
+  #ptermOut .cmd { color: #d8ffd8; }
+  .ptin { display: flex; gap: 6px; align-items: center; padding: 4px 9px 7px; }
+  .ptin input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: #d8ffd8; font: inherit; font-size: 16px; }
+  .ptin button { padding: 4px 10px; background: #143014; color: #8dff8d; border: 1px solid #2f6a2f; border-radius: 6px; font: inherit; }
+  #lobbyCover { justify-content: flex-start; overflow-y: auto; touch-action: pan-y; gap: 8px; padding-top: 10px; background: rgba(8,9,13,0.86); }
+  #lobbyCover h2 { font-size: 26px; flex: none; }
+  #lobbyCover .seg { width: min(460px, 90vw); flex: none; }
+  #lobbyCover .big { flex: none; width: min(460px, 90vw); padding: 12px; font-size: 18px; }
+  #lobbyCover p { font-size: 13px; flex: none; }
+  #lobbyCover .wsub { margin: -6px 0 0; font-size: 12px; font-weight: 800; letter-spacing: 0.35em; color: #c9b9a4; flex: none; }
+  #lobbyHead { color: #ffe2b0 !important; }
+  #lobbyHead b { color: #ffd23f; font-family: ui-monospace, Consolas, monospace; }
+  #roster { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: min(560px, 94vw); flex: none; }
+  #roster .pr { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 6px 8px; border-radius: 10px; background: #161a22; border: 2px solid #232a35; font-weight: 800; font-size: 14px; text-align: left; }
+  #roster .pr.ready { border-color: #3d8a4e; background: #142219; }
+  #roster .pr.me { box-shadow: inset 0 0 0 1px #ffb54a; }
+  #roster .pr.new { animation: arrive 0.9s ease-out; }
+  @keyframes arrive { 0% { transform: scale(0.85); opacity: 0; } 40% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); } }
+  #roster .pr.open { justify-content: center; background: transparent; border: 2px dashed #2c333f; color: #4f5866; font-weight: 700; font-size: 12.5px; }
+  #roster i { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  #roster .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #roster .nm small { display: block; font-size: 11px; font-weight: 700; color: #7d8794; }
+  #roster .nm small b { color: #ffd23f; }
+  #roster .ok { flex: none; font-size: 11.5px; padding: 3px 7px; border-radius: 999px; background: #262d39; color: #8e98a5; }
+  #roster .pr.ready .ok { background: #2f6b3c; color: #fff; }
+  #roster .kick, #roster .crown { width: 30px; height: 30px; flex: none; padding: 0; border-radius: 7px; border: 1px solid #3a4352; background: #262d39; color: #aeb6c0; font-size: 13px; }
+  #roster .crown { color: #ffd23f; }
+  #lReady { border-color: #46995a !important; color: #7fe08f !important; background: #18261b !important; }
+  #lReady.on { background: #2f6b3c !important; color: #fff !important; }
+  #diffRO { flex: none; font-size: 13px; color: #a9b2bd; }
+  #diffRO b { color: #ffb54a; }
+  #startBtn.all { animation: glow 1.2s ease-in-out infinite; }
+  #resumeRunBtn { background: #1f4a6a; border-color: #4fb4ff; line-height: 1.2; }
+  #resumeRunBtn small { display: block; font-size: 12px; font-weight: 600; color: #cfe6ff; margin-top: 2px; }
+  @keyframes glow { 50% { box-shadow: 0 0 22px rgba(255,122,60,0.9); } }
+  #psaves { display: none; width: min(460px, 90vw); flex: none; flex-direction: column; gap: 6px; }
+  #psaves.show { display: flex; }
+  #psaves h3 { margin: 4px 0 0; font-size: 13px; color: #a9b2bd; }
+  #pslist { display: flex; flex-direction: column; gap: 6px; }
+  .srow { display: flex; gap: 6px; }
+  .srow .ld { flex: 1; padding: 9px 10px; text-align: left; font-size: 14px; font-weight: 800; color: #e8ecf1; background: #161a22; border: 2px solid #3a4352; border-radius: 10px; }
+  .srow .ld small { display: block; font-size: 11.5px; font-weight: 600; color: #8a94a0; }
+  .srow .dl { flex: none; min-width: 46px; font-size: 14px; font-weight: 800; color: #aeb6c0; background: #262d39; border: 1px solid #3a4352; border-radius: 10px; }
+  .srow .dl.sure { background: #5a1a14; border-color: #ff5a4f; color: #ffd0cc; }
+  .devseg { display: none !important; align-items: center; }
+  .devseg.show { display: flex !important; }
+  .devseg span { flex: none; padding: 0 8px; font-weight: 800; color: #ffd23f; }
+  .devseg button { flex: 1; }
+  #dMinus, #dPlus { flex: 0 0 52px !important; font-size: 20px !important; }
+  #shopCover { align-items: stretch; justify-content: flex-start; text-align: left; padding: 8px 10px 0; gap: 6px; touch-action: pan-y; background: #0b0d12; z-index: 18; }
+  #shopHead { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 16px; flex: none; }
+  #shopHead .m { color: #ffd23f; }
+  #shopHead button { margin-left: auto; height: 40px; padding: 0 18px; font-size: 14px; font-weight: 800; color: #e8ecf1; background: #262d39; border: 1px solid #3a4352; border-radius: 10px; }
+  #shopBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #gearCover { z-index: 25; gap: 10px; touch-action: pan-y; overflow-y: auto; justify-content: flex-start; padding-top: 14px; }
+  .vols { display: flex; flex-direction: column; gap: 8px; width: min(460px, 90vw); }
+  .vols label { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 14px; color: #c2cad4; }
+  .vols input[type=range] { flex: 1; accent-color: #ffb54a; height: 28px; touch-action: pan-x; }
+
+  #gearCover h3 { margin: 0; font-size: 14px; color: #a9b2bd; font-weight: 700; }
+  #toast { position: fixed; left: 50%; top: 54px; transform: translateX(-50%); padding: 8px 16px; border-radius: 10px; background: rgba(20,24,32,0.96); border: 1px solid #3a4352; font-weight: 700; font-size: 14px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 50; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+  #toast.bad { border-color: #ff5a4f; color: #ffd0cc; }
+  #toast.good { border-color: #46995a; color: #c8f5d0; }
+  #toast.info { border-color: #ffb54a; color: #ffe2b0; font-size: 17px; }
+  #cbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 132px; z-index: 7; display: none; gap: 8px; }
+  #cbar.show { display: flex; }
+  #cbar.top { bottom: auto; top: 64px; }
+  #cOk { height: 54px; min-width: 190px; padding: 0 16px; font-size: 17px; font-weight: 900; color: #06210d; background: #7fe08f; border: 0; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
+  #cOk small { display: block; font-size: 12px; font-weight: 700; color: #1d5a2a; }
+  #cOk:disabled { background: #4a5a4d; color: #1d2a20; }
+  #cNo { height: 54px; width: 54px; font-size: 22px; font-weight: 900; color: #e8ecf1; background: rgba(38,45,57,0.95); border: 1px solid #3a4352; border-radius: 12px; }
+  #spop { position: absolute; z-index: 8; display: none; transform: translate(-50%, -100%); padding: 6px; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 330px;
+    background: rgba(13,16,22,0.96); border: 2px solid #4fb4ff; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.6); }
+  #spop.show { display: flex; }
+  #spop .t { flex: 1 1 100%; text-align: center; font-size: 12.5px; font-weight: 800; color: #9fd4ff; }
+  #spop button { height: 44px; min-width: 70px; padding: 0 10px; font-size: 13px; font-weight: 800; line-height: 1.1; color: #e8ecf1; background: #262d39; border: 1px solid #3a4352; border-radius: 9px; }
+  #spop button small { display: block; font-size: 11px; color: #ffd23f; font-weight: 700; }
+  #spop button.mv { background: #1d3a55; border-color: #4fb4ff; }
+  #qUndo, #undoBtn { height: 58px; padding: 0 12px; font-size: 14px; font-weight: 800; color: #ffd9a0; background: #2a2416; border: 1px solid #8a6a3a; border-radius: 10px; }
+  #qUndo:disabled, #undoBtn:disabled { opacity: 0.4; }
+  #pauseCover { z-index: 24; justify-content: flex-start; padding-top: 10px; gap: 8px; touch-action: pan-y; }
+  #pauseCover .shop { width: 100%; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #pauseCover .shop-body { text-align: left; }
+  #pauseCover .seg { width: min(520px, 92vw); flex: none; }
+  #pauseCover .seg button { padding: 12px 6px; font-size: 15px; }
+  #staleNote { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 9; display: none; padding: 9px 14px; max-width: 80vw; text-align: center;
+    background: rgba(40,16,10,0.95); border: 1px solid #ff7a3c; border-radius: 10px; color: #ffd8c8; font-size: 13.5px; font-weight: 700; }
+  #staleNote.show { display: block; }
+  #rotate { position: fixed; inset: 0; z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #0b0d12; text-align: center; padding: 30px; }
+  #rotate div { font-size: 60px; }
+  @media (orientation: portrait) { body.playing #rotate { display: flex; } }
+</style>
+</head>
+<body class="gameview">
+<canvas id="view"></canvas>
+
+<div id="join" class="screen show pad-safe">
+  <h1>LAST EMBER</h1>
+  <input id="name" maxlength="14" placeholder="Your name" autocomplete="off" autocapitalize="words" spellcheck="false">
+  <div class="seg" id="joinMode">
+    <button data-mode="game">Game on my phone<small>play looking at this screen</small></button>
+    <button data-mode="classic">Controller only<small>watch the big screen</small></button>
+  </div>
+  <button class="big" id="joinBtn">JOIN</button>
+  <p id="joinNote">You can switch any time from the MENU button.</p>
+  <p><a href="/screen" style="color:#ffb54a">Use this device as a shared big screen instead</a></p>
+</div>
+
+<div id="play" class="screen pad-safe">
+  <div id="bar">
+    <span id="dot"></span><span id="pname"></span>
+    <div id="hpwrap"><div id="hp"></div><div id="hptxt"></div></div>
+    <span id="money">$0</span>
+    <span id="status"></span>
+    <button id="gearBtn">MENU</button>
+  </div>
+  <div id="field">
+    <div id="tap"></div>
+    <div class="zone" id="zl"><div class="ring"></div><div class="knob"></div><div class="lbl">MOVE</div></div>
+    <div class="zone" id="zr"><div class="ring"></div><div class="knob"></div><div class="lbl">AIM + FIRE</div></div>
+    <canvas id="mini" width="272" height="154"></canvas>
+    <div class="btns" id="bl">
+      <button class="pbtn" id="shopBtn">SHOP<small>buy &amp; perks</small></button>
+      <button class="pbtn" id="buildBtn">BUILD<small>&amp; move</small></button>
+      <button class="pbtn" id="readyBtn">READY<small>start night</small></button>
+    </div>
+    <div class="btns" id="br">
+      <button class="pbtn" id="swapBtn">SWAP<small>weapon</small></button>
+      <button class="pbtn" id="reloadBtn">RELOAD</button>
+    </div>
+    <div id="weapon"></div>
+    <div id="buildbar"><b id="buildName"></b><button id="placeBtn">PLACE</button><button id="undoBtn">UNDO</button><button id="doneBtn">DONE</button></div>
+    <div id="staleNote"></div>
+    <div id="cbar"><button id="cOk">PLACE</button><button id="cNo">✕</button></div>
+    <div id="spop"></div>
+    <div id="qbar">
+      <div id="qhint"></div>
+      <div id="qrow"><div id="qitems"></div><button id="qUndo">UNDO</button><button id="qDone">DONE</button></div>
+    </div>
+    <div id="hurt"></div>
+
+    <div class="cover" id="downCover"><h2>YOU'RE DOWN</h2><p>A teammate has to stand next to you for 3 seconds. If anyone survives the night, you get back up at dawn.</p></div>
+    <div class="cover" id="shopCover">
+      <div id="shopHead"><span>Supply crate</span><span class="m" id="shopMoney"></span><button id="shopClose">BACK TO FIGHT</button></div>
+      <div id="shopBody"></div>
+    </div>
+    <div class="cover" id="lobbyCover">
+      <h2>LAST EMBER</h2>
+      <div class="wsub">WAITING ROOM</div>
+      <p id="lobbyHead"></p>
+      <div id="roster"></div>
+      <button class="big" id="lReady">TAP WHEN READY</button>
+      <button class="big" id="resumeRunBtn" style="display:none"></button>
+      <button class="big" id="startBtn">NEW GAME</button>
+      <div id="diffRO"></div>
+      <div class="seg" id="diffSeg"><button data-d="easy">Easy</button><button data-d="normal">Normal</button><button data-d="hard">Hard</button></div>
+      <div class="seg" id="devTogSeg"><button id="devToggle">Dev mode</button><button id="termToggle">&gt;_ Terminal</button></div>
+      <div id="pterm"><div id="ptermOut"></div><div class="ptin"><b>&gt;</b><input id="ptermIn" maxlength="80" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" placeholder="type help"><button id="ptermGo">↵</button></div></div>
+      <div class="seg devseg" id="devSeg">
+        <button id="dMoney">Infinite funds: OFF</button><button id="dMinus">−</button><span id="dNight">Night 1</span><button id="dPlus">+</button>
+      </div>
+      <div class="seg devseg" id="devSeg2"><button id="dWyrm">Bonewyrm every night 10+: OFF</button></div>
+      <div id="psaves"><h3>SAVED GAMES</h3><div id="pslist"></div></div>
+      <p id="lobbyTxt"></p>
+    </div>
+    <div class="cover" id="overCover"><h2 style="color:#ff5a4f">THE FIRE WENT OUT</h2><p id="overTxt"></p><div class="obtns"><button class="big alt" id="viewBtn">VIEW THE CAMP</button><button class="big alt" id="replayBtn">REPLAY LAST 3 s</button></div><button class="big" id="againBtn">PLAY AGAIN</button></div>
+    <div id="overBar"><button id="obReplay">REPLAY</button><button id="obResults">RESULTS</button><button id="obAgain">PLAY AGAIN</button></div>
+    <div id="replayTag"><span class="dot"></span>REPLAY<div class="rbar"><i id="replayFill"></i></div></div>
+    <div class="cover" id="gearCover">
+      <h3>WHAT THIS PHONE SHOWS</h3>
+      <div class="seg" id="gearMode">
+        <button data-mode="game">Game on my phone<small>play looking at this screen</small></button>
+        <button data-mode="classic">Controller only<small>watch the big screen</small></button>
+      </div>
+      <h3>PHONE SOUND</h3>
+      <div class="seg" id="gearSound"><button data-snd="1">On</button><button data-snd="0">Off</button></div>
+      <h3>MUSIC</h3>
+      <div class="seg" id="gearMusic"><button data-mus="1">On</button><button data-mus="0">Off</button></div>
+      <h3>GUN SOUNDS (TAP TO HEAR)</h3>
+      <div class="seg wrap" id="gunStyles"></div>
+      <h3>MUSIC (TAP TO HEAR ITS NIGHT)</h3>
+      <div class="seg wrap" id="musicStyles"></div>
+      <p id="styleDesc" class="sdesc"></p>
+      <a href="/sounds" target="_blank" style="color:#ffb54a;font-weight:700;font-size:13px">Full sound test page ↗</a>
+      <h3>VOLUME (THIS PHONE)</h3>
+      <div class="vols">
+        <label>Master <input type="range" min="0" max="100" data-vol="master"></label>
+        <label>Music <input type="range" min="0" max="100" data-vol="music"></label>
+        <label>Effects <input type="range" min="0" max="100" data-vol="sfx"></label>
+      </div>
+      <h3>GAME (AFFECTS EVERYONE)</h3>
+      <div class="seg"><button id="gSave">Save game</button><button id="gPause">Pause game</button><button id="gQuit">Quit to main menu</button></div>
+      <div class="seg" id="speedSeg"><button data-spd="1">Speed 1×</button><button data-spd="2">2×</button><button data-spd="3">3×</button><button data-spd="5">5×</button><button data-spd="10">10×</button></div>
+      <div class="seg"><button id="fsBtn">Fullscreen</button><button id="gearClose" class="on">Back to game</button></div>
+    </div>
+    <div class="cover" id="pauseCover">
+      <h2>PAUSED</h2>
+      <div class="shop"><div class="shop-body" id="pauseIntel"></div></div>
+      <div class="seg"><button id="pResume" class="on">Resume</button><button id="pSave">Save game</button><button id="pQuit">Quit to main menu</button></div>
+    </div>
+    <div class="cover" id="waitCover"><h2>CONNECTING...</h2><p id="waitTxt"></p></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="rotate"><div>&#8635;</div><b>Turn your phone sideways</b></div>
+
+<script src="/js/data.js"></script>
+<script src="/js/sim.js"></script>
+<script src="/js/audio.js"></script>
+<script src="/js/render.js"></script>
+<script src="/js/netview.js"></script>
+<script src="/js/shopui.js"></script>
+<script>
+(function () {
+  'use strict';
+  const GD = window.GD, AudioFX = window.AudioFX;
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
+  };
+  let id = store.get('le_id');
+  if (!id || !/^[a-zA-Z0-9_-]{6,40}$/.test(id)) {
+    id = '';
+    const abc = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 14; i++) id += abc[(Math.random() * abc.length) | 0];
+    store.set('le_id', id);
+  }
+  let ws = null, open = false, joined = false, hostUp = false, st = null, shopOpen = false, gearOpen = false;
+  let mode = store.get('le_mode') === 'classic' ? 'classic' : 'game';
+  let sound = store.get('le_snd') !== '0';                 // on by default
+  let musicPref = store.get('le_music') !== '0';
+  let lastBuild = 'wood', lastWorld = 0, quitArmT = 0;
+  const PROTO = 6;
+  const input = { mx: 0, my: 0, ax: 0, ay: 0 };
+  let lastSent = '', lastSentAt = 0;
+  let R = null, mirror = null, icons = null;       // created the first time the game view is used
+
+  $('name').value = store.get('le_name') || '';
+
+  // ---------------------------------------------------------------- network
+
+  // ---- shared clock (music on every device stays in step with the server)
+  const clockSamples = [];
+  function syncClock(serverNow) {
+    if (typeof serverNow !== 'number') return;
+    clockSamples.push(serverNow - Date.now());
+    if (clockSamples.length > 60) clockSamples.shift();
+  }
+  window.AudioFX.setClock(() => Date.now() + (clockSamples.length ? Math.max.apply(null, clockSamples) : 0));
+  function musicState(phase, zombies, left, fc, hasBoss) {
+    const mode = phase === 'lobby' ? 'menu' : phase === 'night' ? 'night' : phase === 'over' ? 'over' : 'day';
+    const intensity = phase === 'night' ? Math.min(1, Math.max(zombies / 45, left / 120)) : 0;
+    // music stops while the game is paused, unless the gear menu (where the music is chosen) is open
+    const held = !!(st && st.paused) && (phase === 'day' || phase === 'night') && !gearOpen;
+    window.AudioFX.setMusic({ mode, intensity, boss: !!hasBoss, blood: !!(fc && fc.blood && phase === 'night'), paused: held });
+  }
+  // the server restarted with newer code: reload so this phone runs the same scripts, and rejoin straight away
+  let pageBuild = null;
+  function checkBuild(b) {
+    if (!b) return false;
+    if (pageBuild === null) { pageBuild = b; return false; }
+    if (b === pageBuild) return false;
+    pageBuild = b;
+    location.reload();
+    return true;
+  }
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}/ws?role=pad&id=${id}`);
+    ws.onopen = () => { open = true; if (joined) hello(); refresh(); };
+    ws.onclose = () => { open = false; hostUp = false; refresh(); setTimeout(connect, 800); };
+    ws.onerror = () => {};
+    ws.onmessage = (ev) => {
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.t === 'w') { if (m.meta) { syncClock(m.meta.now); if (checkBuild(m.meta.build)) return; } onWorld(m, ev.data); }
+      else if (m.t === 'host') { hostUp = !!m.up; if (hostUp && joined) hello(); if (!hostUp) st = null; refresh(); }
+      else if (m.t === 'st') { if (checkBuild(m.code)) return; st = m; hostUp = true; syncClock(m.now); refresh(); }
+      else if (m.t === 'fb') feedback(m);
+      else if (m.t === 'note') toast(m.msg, 'info', 3200);
+      else if (m.t === 'term') ptermPrint(m.out || []);
+      else if (m.t === 'kicked' && m.p === id) {       // someone removed us from the lobby: back to the join screen
+        joined = false; st = null;
+        try { sessionStorage.removeItem('le_rejoin'); } catch (e) { /* private mode */ }
+        $('play').classList.remove('show'); $('join').classList.add('show');
+        document.body.classList.remove('playing');
+        $('joinNote').textContent = 'You were removed from the lobby. Press JOIN to come back.';
+      }
+    };
+  }
+  function send(obj) { if (open) { try { ws.send(JSON.stringify(obj)); } catch (e) { /* reconnects */ } } }
+  function hello() {
+    send({ t: 'hello', name: $('name').value.trim().slice(0, 14) || 'Survivor' });
+    send({ t: 'act', a: 'view', v: mode === 'game' ? 1 : 0 });
+  }
+  function act(a, v) { send({ t: 'act', a, v }); }
+
+  function buzz(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { /* unsupported */ } }
+  let toastT = 0;
+  function toast(msg, cls, ms) {
+    const t = $('toast');
+    t.textContent = msg; t.className = 'show ' + (cls || '');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => { t.className = ''; }, ms || 1200);
+  }
+  function feedback(m) {
+    if (m.k === 'hurt') {
+      buzz(50);
+      const h = $('hurt'); h.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => h.classList.remove('on')));
+    } else if (m.k === 'deny') { buzz(25); toast(m.msg, 'bad'); }
+    else if (m.k === 'buy') toast('Got ' + m.msg, 'good');
+    else if (m.k === 'down') buzz([200, 80, 200]);
+    else if (m.k === 'revive') { buzz(80); toast('Back on your feet!', 'good'); }
+    else if (m.k === 'dry') toast(m.msg, 'bad');
+    else if (m.k === 'info') toast(m.msg, 'good');
+  }
+
+  // ---------------------------------------------------------------- view mode (game on phone / controller only)
+  function ensureView() {
+    if (R) return;
+    R = new window.Renderer($('view'));
+    R.maxDpr = 1.5;
+    R.viewH = 540;
+    R.resize();
+    mirror = new window.NetView.Mirror(id);
+    icons = {};
+    for (const k of GD.STRUCT_ORDER) { try { icons[k] = R.icon(k).toDataURL(); } catch (e) { icons[k] = ''; } }
+    buildQbar();
+  }
+  function setMode(m, quiet) {
+    mode = m === 'classic' ? 'classic' : 'game';
+    store.set('le_mode', mode);
+    document.body.classList.toggle('gameview', mode === 'game');
+    document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+    if (mode === 'game' && joined) ensureView();
+    if (joined && !quiet) act('view', mode === 'game' ? 1 : 0);
+    if (R) R.resize();
+    sl.home(); sr.home();
+    refresh();
+  }
+  function setSound(on) {
+    sound = !!on;
+    store.set('le_snd', sound ? '1' : '0');
+    document.querySelectorAll('[data-snd]').forEach((b) => b.classList.toggle('on', (b.dataset.snd === '1') === sound));
+    if (sound) AudioFX.init();
+    AudioFX.setMuted(!sound);
+  }
+  function onWorld(m, raw) {
+    lastWorld = performance.now();
+    if (mode !== 'game' || !mirror) return;
+    if (raw) recordReplay(raw, m);
+    const prevPhase = mirror.phase;
+    const evs = mirror.apply(m, performance.now() / 1000);
+    if (mirror.phase === 'lobby' && prevPhase !== 'lobby') R.clearWorld();      // fresh ground for the next game
+    for (const e of evs) {
+      R.handle(e, mirror);
+      if (sound) AudioFX.event(e);
+      if (e.type === 'nightStart') toast('NIGHT ' + e.night + ' - they are coming', 'info', 2600);
+      else if (e.type === 'dawn' && !e.first) toast('DAWN  +$' + GD.fmt(e.bonus) + '  ·  everything repaired', 'info', 2600);
+      else if (e.type === 'supply') { toast('SUPPLY DROP! New gear in the shop: ' + (e.names || []).slice(0, 4).join(', ') + ((e.names || []).length > 4 ? '...' : ''), 'info', 4500); buzz([40, 30, 40]); }
+      else if (e.type === 'boss') toast('ABOMINATION from the ' + e.side + '!', 'bad', 2600);
+      else if (e.type === 'fireHit' && performance.now() - fireWarnAt > 8000) { fireWarnAt = performance.now(); toast('THE CAMPFIRE IS UNDER ATTACK!', 'bad', 2200); buzz([80, 60, 80]); }
+      else if (e.type === 'wyrm') { toast((e.ztype === 'gorewyrm' ? 'GOREWYRM' : 'BONEWYRM') + ' from the ' + e.side + '! Shoot it apart!', 'bad', 3200); buzz([60, 40, 60, 40, 120]); }
+    }
+  }
+  let fireWarnAt = -1e9;
+  function fullscreen() {
+    const el = document.documentElement;
+    try {
+      const p = el.requestFullscreen ? el.requestFullscreen() : (el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null);
+      const lock = () => { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* unsupported */ } };
+      if (p && p.then) p.then(lock).catch(() => {}); else lock();
+    } catch (e) { /* fullscreen is a nicety */ }
+  }
+
+  // ---------------------------------------------------------------- join
+  function join() {
+    const n = $('name').value.trim();
+    if (!n) { $('name').focus(); $('joinNote').textContent = 'Type a name first.'; return; }
+    store.set('le_name', n);
+    joined = true;
+    try { sessionStorage.setItem('le_rejoin', '1'); } catch (e) { /* private mode */ }   // a refresh rejoins by itself
+    $('name').blur();
+    $('join').classList.remove('show');
+    $('play').classList.add('show');
+    document.body.classList.add('playing');
+    fullscreen();
+    if (sound) AudioFX.init();
+    setMode(mode, true);
+    hello();
+    refresh();
+  }
+  $('joinBtn').addEventListener('click', join);
+  try {
+    if (sessionStorage.getItem('le_rejoin') === '1' && $('name').value.trim()) setTimeout(join, 0);
+  } catch (e) { /* private mode */ }
+  $('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(); });
+  document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  document.querySelectorAll('[data-snd]').forEach((b) => b.addEventListener('click', () => setSound(b.dataset.snd === '1')));
+  function setMusicPref(on) {
+    musicPref = !!on;
+    store.set('le_music', musicPref ? '1' : '0');
+    AudioFX.setMusicOn(musicPref);
+    document.querySelectorAll('[data-mus]').forEach((b) => b.classList.toggle('on', (b.dataset.mus === '1') === musicPref));
+  }
+  document.querySelectorAll('[data-mus]').forEach((b) => b.addEventListener('click', () => setMusicPref(b.dataset.mus === '1')));
+  // phones only allow sound after a tap: start audio on the very first touch
+  document.addEventListener('pointerdown', () => { if (sound) AudioFX.init(); }, { passive: true });
+  setInterval(() => {
+    if (!st) return;
+    const mz = mirror ? mirror.zombies : [];
+    musicState(st.phase, mz.length, st.left || 0, st.forecast, mz.some((z) => z.type === 'boss' || z.type === 'wyrm' || z.type === 'gorewyrm' || z.type === 'colossus') || (st.forecast && st.forecast.boss && st.phase === 'night'));
+  }, 250);
+
+  // ---------------------------------------------------------------- sticks
+  function stick(zone, onChange, onHold) {
+    const ring = zone.querySelector('.ring'), knob = zone.querySelector('.knob');
+    const RAD = 58;
+    let pid = null, ox = 0, oy = 0, sx = 0, sy = 0, holdT = 0;
+    function home() {
+      const r = zone.getBoundingClientRect();
+      const hx = r.width / 2, hy = r.height * (r.height < 220 ? 0.5 : 0.62);
+      ring.style.left = knob.style.left = hx + 'px';
+      ring.style.top = knob.style.top = hy + 'px';
+      ring.classList.remove('active', 'fire');
+    }
+    function place(e) {
+      const r = zone.getBoundingClientRect();
+      let dx = e.clientX - ox, dy = e.clientY - oy;
+      const d = Math.hypot(dx, dy);
+      if (d > RAD) {          // drag the base along so the thumb never "falls off"
+        ox += dx * (1 - RAD / d); oy += dy * (1 - RAD / d);
+        dx = e.clientX - ox; dy = e.clientY - oy;
+      }
+      ring.style.left = (ox - r.left) + 'px'; ring.style.top = (oy - r.top) + 'px';
+      knob.style.left = (e.clientX - r.left) + 'px'; knob.style.top = (e.clientY - r.top) + 'px';
+      let x = dx / RAD, y = dy / RAD;
+      const m = Math.hypot(x, y);
+      if (m < 0.12) { x = 0; y = 0; }
+      ring.classList.toggle('fire', m > 0.5);
+      onChange(x, y);
+    }
+    function release() { pid = null; clearTimeout(holdT); onChange(0, 0); home(); }
+    zone.addEventListener('pointerdown', (e) => {
+      if (pid !== null) return;
+      pid = e.pointerId; ox = sx = e.clientX; oy = sy = e.clientY;
+      try { zone.setPointerCapture(pid); } catch (err) { /* fine */ }
+      ring.classList.add('active');
+      place(e);
+      clearTimeout(holdT);
+      if (onHold) holdT = setTimeout(() => { if (pid !== null && onHold(sx, sy)) release(); }, 420);
+      e.preventDefault();
+    });
+    zone.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== pid) return;
+      if (Math.hypot(e.clientX - sx, e.clientY - sy) > 12) clearTimeout(holdT);
+      place(e); e.preventDefault();
+    });
+    const end = (e) => { if (e.pointerId === pid) release(); };
+    zone.addEventListener('pointerup', end);
+    zone.addEventListener('pointercancel', end);
+    zone.addEventListener('lostpointercapture', end);
+    window.addEventListener('resize', () => { if (pid === null) home(); });
+    return { home, reset: release };
+  }
+  // Press and hold any build (game view) to pick it up straight away.
+  function holdGrab(cx, cy) {
+    if (mode !== 'game' || !R || !mirror || !st || st.down || st.carry || (st.phase !== 'day' && st.phase !== 'night')) return false;
+    const w = R.toWorld(cx, cy);
+    const s = mirror.structAt(Math.floor(w.x / GD.CELL), Math.floor(w.y / GD.CELL));
+    if (!s) return false;
+    buzz(30);
+    act('grab', { x: w.x, y: w.y });
+    return true;
+  }
+  const sl = stick($('zl'), (x, y) => { input.mx = x; input.my = y; }, holdGrab);
+  const sr = stick($('zr'), (x, y) => { input.ax = x; input.ay = y; }, holdGrab);
+
+  const frozen = () => shopOpen || gearOpen || !st || st.down || st.paused || st.phase === 'over';
+  setInterval(() => {
+    if (!joined || !open) return;
+    const m = frozen() ? { t: 'in', mx: 0, my: 0, ax: 0, ay: 0 }
+      : { t: 'in', mx: +input.mx.toFixed(2), my: +input.my.toFixed(2), ax: +input.ax.toFixed(2), ay: +input.ay.toFixed(2) };
+    const s = JSON.stringify(m), now = Date.now();
+    if (s === lastSent && now - lastSentAt < 400) return;
+    lastSent = s; lastSentAt = now;
+    ws.send(s);
+  }, 33);
+
+  // ---------------------------------------------------------------- building on the phone (game view)
+  // Tap = preview (nothing is spent until you press the green button). Drag = line of walls.
+  // Tap any build = select it (move it; selling only your own).
+  const PAINT = { wood: 1, steel: 1, wire: 1, gate: 1 };
+  let pending = null;          // { id, gun, cells: [[cx, cy], ...], carry: bool }
+  let selected = null;         // { cx, cy, uid } of one of your structures
+  let tapId = null, tapStart = null, tapMoved = false, keepBuild = false;
+  const cellOf = (e) => { const w = R.toWorld(e.clientX, e.clientY); return [Math.floor(w.x / GD.CELL), Math.floor(w.y / GD.CELL)]; };
+  function lineCells(a, b) {
+    const out = [], dx = b[0] - a[0], dy = b[1] - a[1];
+    const horiz = Math.abs(dx) >= Math.abs(dy), n = Math.min(40, Math.max(Math.abs(dx), Math.abs(dy)));
+    const sx = Math.sign(dx), sy = Math.sign(dy);
+    for (let i = 0; i <= n; i++) out.push(horiz ? [a[0] + sx * i, a[1]] : [a[0], a[1] + sy * i]);
+    return out;
+  }
+  function clearPending() { pending = null; updateBuildUi(); }
+  function clearSelection() { selected = null; updateBuildUi(); }
+  function onTapDown(e) {
+    if (!R || !st || !st.build) return;
+    const c = cellOf(e);
+    tapStart = c; tapMoved = false;
+    if (st.carry) { pending = { id: st.carry, cells: [c], carry: true }; selected = null; updateBuildUi(); return; }
+    const s0 = mirror.structAt(c[0], c[1]);
+    if (s0 && GD.STRUCTS[s0.id].husk) { toast('A dead Bonewyrm: it rots away at dawn', 'info', 1800); return; }
+    if (s0) {
+      pending = null;
+      selected = { cx: s0.cx, cy: s0.cy, uid: s0.uid }; buzz(15);
+      updateBuildUi();
+      return;
+    }
+    selected = null;
+    if (GD.STRUCTS[st.build]) pending = { id: st.build, cells: [c] };
+    updateBuildUi();
+  }
+  function onTapMove(e) {
+    if (!pending || !tapStart) return;
+    const c = cellOf(e);
+    if (c[0] !== tapStart[0] || c[1] !== tapStart[1]) tapMoved = true;
+    pending.cells = (!pending.carry && PAINT[pending.id]) ? lineCells(tapStart, c) : [c];
+    updateBuildUi();
+  }
+  $('tap').addEventListener('pointerdown', (e) => {
+    if (tapId !== null) return;
+    tapId = e.pointerId;
+    try { $('tap').setPointerCapture(tapId); } catch (err) { /* fine */ }
+    onTapDown(e); e.preventDefault();
+  });
+  $('tap').addEventListener('pointermove', (e) => { if (e.pointerId === tapId) { onTapMove(e); e.preventDefault(); } });
+  const tapEnd = (e) => { if (e.pointerId === tapId) { tapId = null; tapStart = null; } };
+  $('tap').addEventListener('pointerup', tapEnd);
+  $('tap').addEventListener('pointercancel', tapEnd);
+
+  function validCells() {
+    if (!pending) return [];
+    const seen = new Set();
+    return pending.cells.filter((c) => { const k = c[0] + ',' + c[1]; if (seen.has(k) || !mirror.canPlace(c[0], c[1])) return false; seen.add(k); return true; });
+  }
+  tap($('cOk'), () => {
+    if (!pending) return;
+    const cells = validCells();
+    if (!cells.length) { toast("Can't build there", 'bad'); return; }
+    if (pending.carry) {
+      act('placeAt', { x: cells[0][0] * GD.CELL + 20, y: cells[0][1] * GD.CELL + 20 });
+      if (keepBuild) act('build', lastBuild);          // stay in build mode after a move started from the menu
+      keepBuild = false;
+    } else act('placeMany', { id: pending.id, cells });
+    pending = null; updateBuildUi();
+  });
+  tap($('cNo'), () => {
+    if (pending && pending.carry) { act('undo'); keepBuild = false; }        // undo while carrying = put it back
+    clearPending();
+  });
+  function selStruct() { return selected ? mirror.structAt(selected.cx, selected.cy) : null; }
+  $('spop').addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('[data-s]');
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation(); buzz(10);
+    const s0 = selStruct(), k = b.dataset.s;
+    if (!s0) { clearSelection(); return; }
+    if (k === 'move') { keepBuild = !!(st.build && GD.STRUCTS[st.build]); act('grab', { x: s0.x, y: s0.y }); clearSelection(); toast('Tap where it should go, then press the green button', 'info', 2200); }
+    else if (k === 'sell') { act('toolAt', { tool: k, cx: s0.cx, cy: s0.cy }); clearSelection(); }
+    else clearSelection();
+  });
+  function popupHtml(s0) {
+    const def = GD.STRUCTS[s0.id];
+    const frac = Math.max(0, Math.min(1, s0.hp / 100));
+    const sell = Math.floor(def.cost * 0.6 * frac);
+    const mine = s0.owner === id, o = mine ? null : mirror.getPlayer(s0.owner);
+    let h = '<div class="t">' + def.name + (frac < 1 ? ' · ' + Math.round(frac * 100) + '% hp' : '') +
+      (mine ? '' : ' · ' + (o ? o.name.replace(/[<>&"]/g, '') + "'s" : 'a teammate\'s')) + '</div>';
+    h += '<button class="mv" data-s="move">MOVE<small>free</small></button>';
+    if (mine) h += '<button data-s="sell">SELL<small>+$' + GD.fmt(sell) + '</small></button>';
+    h += '<button data-s="x">✕</button>';
+    return h;
+  }
+  let popSig = '';
+  function placePopup() {
+    const pop = $('spop'), s0 = selStruct();
+    if (!s0 || !R) { pop.classList.remove('show'); popSig = ''; return; }
+    const html = popupHtml(s0);
+    if (html !== popSig) { pop.innerHTML = html; popSig = html; }
+    pop.classList.add('show');
+    const fr = $('field').getBoundingClientRect();
+    const x = (s0.x - R.camX) * R.cssScale - fr.left, y = (s0.y - GD.CELL / 2 - R.camY) * R.cssScale - fr.top - 6;
+    pop.style.left = Math.max(170, Math.min(fr.width - 170, x)) + 'px';
+    const below = y - pop.offsetHeight < 64;            // too close to the top buttons: open underneath instead
+    pop.style.transform = below ? 'translate(-50%, 0)' : 'translate(-50%, -100%)';
+    pop.style.top = (below ? y + GD.CELL * R.cssScale + 18 : y) + 'px';
+  }
+  function updateBuildUi() {
+    const on = !!(st && st.build) && document.body.classList.contains('building');
+    if (!on) { pending = null; selected = null; }
+    if (selected && !selStruct()) selected = null;
+    const cb = $('cbar');
+    if (pending && on) {
+      const cells = validCells();
+      const ok = $('cOk');
+      ok.textContent = '';
+      if (pending.carry) {
+        ok.appendChild(document.createTextNode(cells.length ? '✓ PUT HERE' : 'BLOCKED'));
+      } else {
+        const cost = GD.structCost(pending.id, st.perks.engineer || 0);
+        ok.appendChild(document.createTextNode(cells.length ? '✓ PLACE' + (cells.length > 1 ? ' ' + cells.length : '') : 'BLOCKED'));
+        const sm = document.createElement('small');
+        sm.textContent = GD.STRUCTS[pending.id].name + (cells.length ? ' · $' + GD.fmt(cost * cells.length) : '');
+        ok.appendChild(sm);
+      }
+      ok.disabled = !cells.length;
+      cb.classList.add('show');
+    } else cb.classList.remove('show');
+    placePopup();
+  }
+
+  // supply drops: hide build buttons for gear that has not been unlocked yet
+  let qbarLocks = '';
+  function lockQbar() {
+    if (!st) return;
+    const sig = st.night + '|' + !!st.unlockAll;
+    if (sig === qbarLocks) return;
+    qbarLocks = sig;
+    document.querySelectorAll('#qitems [data-b]').forEach((b) => {
+      const k = b.dataset.b;
+      b.style.display = GD.TOOLS[k] || GD.unlocked(k, st.night, st.unlockAll) ? '' : 'none';
+    });
+  }
+  function buildQbar() {
+    const box = $('qitems');
+    box.textContent = '';
+    const mk = (k, tool) => {
+      const b = document.createElement('button');
+      b.className = 'qi' + (tool ? ' tool' : '');
+      b.dataset.b = k;
+      if (!tool && icons[k]) { const im = document.createElement('img'); im.src = icons[k]; im.alt = ''; b.appendChild(im); }
+      const nm = document.createElement('span'); nm.textContent = tool ? GD.TOOLS[k].name : GD.STRUCTS[k].gun ? GD.STRUCTS[k].name.replace(' Turret', '') : GD.STRUCTS[k].name; b.appendChild(nm);
+      if (!tool) { const c = document.createElement('i'); c.dataset.cost = k; b.appendChild(c); }
+      box.appendChild(b);
+    };
+    for (const k of GD.STRUCT_ORDER) {
+      if (k === GD.TURRET_IDS[0]) { const sep = document.createElement('div'); sep.className = 'qsep'; sep.textContent = 'TURRETS'; box.appendChild(sep); }
+      mk(k, false);
+    }
+    qbarLocks = '';
+    box.addEventListener('click', (e) => { const b = e.target.closest('[data-b]'); if (b) { buzz(10); pending = null; selected = null; act('build', b.dataset.b); } });
+  }
+
+  // ---------------------------------------------------------------- buttons
+  function tap(el, fn) {
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); buzz(10); fn(); });
+  }
+  tap($('swapBtn'), () => act('swap', 1));
+  tap($('reloadBtn'), () => act('reload'));
+  tap($('readyBtn'), () => act('ready'));
+  tap($('placeBtn'), () => act('place'));
+  tap($('doneBtn'), () => act('build', ''));
+  tap($('qDone'), () => { pending = null; selected = null; act('build', ''); });
+  tap($('qUndo'), () => { pending = null; act('undo'); });
+  tap($('undoBtn'), () => act('undo'));
+  tap($('buildBtn'), () => {
+    pending = null; selected = null;
+    if (st && st.build) act('build', '');
+    else act('build', mode === 'game' ? lastBuild : 'move');
+  });
+  $('shopBtn').addEventListener('click', () => { shopOpen = true; sl.reset(); sr.reset(); refresh(); });
+  $('shopClose').addEventListener('click', () => { shopOpen = false; refresh(); });
+  $('gearBtn').addEventListener('click', () => { gearOpen = true; sl.reset(); sr.reset(); refresh(); });
+  $('gearClose').addEventListener('click', () => { gearOpen = false; refresh(); });
+  $('fsBtn').addEventListener('click', fullscreen);
+  $('gPause').addEventListener('click', () => { gearOpen = false; act('pause', 1); refresh(); });
+  document.querySelectorAll('[data-spd]').forEach((b) => b.addEventListener('click', () => act('speed', +b.dataset.spd)));
+  $('pResume').addEventListener('click', () => act('pause', 0));
+  // quitting ends the run for everyone, so it takes two taps
+  function quitTap(btn) {
+    const now = Date.now();
+    if (now - quitArmT < 3000) { quitArmT = 0; gearOpen = false; act('quit'); refresh(); return; }
+    quitArmT = now;
+    btn.textContent = 'Tap again to quit';
+    setTimeout(() => { btn.textContent = 'Quit to main menu'; }, 3000);
+  }
+  $('gQuit').addEventListener('click', () => quitTap($('gQuit')));
+  $('pQuit').addEventListener('click', () => quitTap($('pQuit')));
+  $('startBtn').addEventListener('click', () => { if (sound) AudioFX.init(); act('start'); });
+  $('resumeRunBtn').addEventListener('click', () => { if (sound) AudioFX.init(); act('resume'); });
+  $('lReady').addEventListener('click', () => { if (sound) AudioFX.init(); buzz(15); act('ready'); });
+  let devOpen = false, lobbySeen = null;
+  document.querySelectorAll('#diffSeg [data-d]').forEach((b) => b.addEventListener('click', () => act('diff', b.dataset.d)));
+  $('devToggle').addEventListener('click', () => { devOpen = !devOpen; refresh(); });
+  // admin terminal (host only, main menu)
+  function ptermPrint(lines, cls) {
+    const out = $('ptermOut');
+    for (const l of lines) { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = l; out.appendChild(d); }
+    while (out.childNodes.length > 150) out.removeChild(out.firstChild);
+    out.scrollTop = out.scrollHeight;
+  }
+  $('termToggle').addEventListener('click', () => {
+    const on = !$('pterm').classList.contains('show');
+    $('pterm').classList.toggle('show', on); $('termToggle').classList.toggle('on', on);
+    if (on && !$('ptermOut').childNodes.length) ptermPrint(['LAST EMBER admin terminal. Type help.']);
+    if (on) $('ptermIn').focus();
+  });
+  function ptermSend() {
+    const line = $('ptermIn').value.trim(); $('ptermIn').value = '';
+    if (!line) return;
+    ptermPrint(['> ' + line], 'cmd');
+    if (line.toLowerCase() === 'clear') { $('ptermOut').textContent = ''; return; }
+    act('term', line);
+  }
+  $('ptermGo').addEventListener('click', ptermSend);
+  $('ptermIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ptermSend(); } });
+  $('dMoney').addEventListener('click', () => act('devMoney', !(st && st.devMoney)));
+  $('dWyrm').addEventListener('click', () => act('devWyrm', !(st && st.devWyrm)));
+  // count taps locally so quick repeated taps all register before the server confirms
+  let dNightPending = null;
+  const bumpNight = (d) => {
+    const base = dNightPending !== null ? dNightPending : ((st && st.devNight) || 1);
+    dNightPending = Math.max(1, Math.min(99, base + d));
+    $('dNight').textContent = 'Start night ' + dNightPending;
+    act('devNight', dNightPending);
+  };
+  $('dMinus').addEventListener('click', () => bumpNight(-1));
+  $('dPlus').addEventListener('click', () => bumpNight(1));
+  $('againBtn').addEventListener('click', () => act('again'));
+  // ---- after a lost run: look around the final scene, or watch the last 3 seconds again
+  const replay = new window.NetView.Replay(3.5);
+  let overView = false, overSince = 0, rmirror = null, decalKeep = null;
+  function recordReplay(raw, m) {
+    const t = performance.now() / 1000;
+    if (m.ph === 'over') { if (!overSince) overSince = t; else if (t - overSince > 0.7) replay.frozen = true; }
+    else {
+      overSince = 0;
+      if (overView || rmirror) setOverView(false);
+      if (m.ph !== 'night') { if (replay.buf.length) replay.reset(); return; }
+    }
+    replay.record(raw, m, t);
+  }
+  function setOverView(v) {
+    overView = !!v && !!st && st.phase === 'over' && mode === 'game';
+    if (!overView) stopReplay();
+    $('overBar').classList.toggle('show', overView);
+    refresh();
+  }
+  function startReplay() {
+    if (!replay.has() || !R) { toast('Nothing to replay', 'info', 1500); return; }
+    stopReplay();
+    setOverView(true);
+    decalKeep = document.createElement('canvas'); decalKeep.width = R.decals.width; decalKeep.height = R.decals.height;
+    decalKeep.getContext('2d').drawImage(R.decals, 0, 0);
+    R.parts.length = 0; R.rings.length = 0; R.flashes.length = 0; R.texts.length = 0;
+    rmirror = replay.start(performance.now() / 1000, id);
+    $('replayTag').classList.add('show');
+  }
+  function stopReplay() {
+    if (!rmirror) return;
+    replay.stop(); rmirror = null;
+    $('replayTag').classList.remove('show');
+    if (decalKeep && R) { R.dctx.clearRect(0, 0, R.decals.width, R.decals.height); R.dctx.drawImage(decalKeep, 0, 0); decalKeep = null; }
+    if (R) { R.parts.length = 0; R.banner = null; }
+  }
+  $('viewBtn').addEventListener('click', () => setOverView(true));
+  $('replayBtn').addEventListener('click', () => startReplay());
+  $('obReplay').addEventListener('click', () => startReplay());
+  $('obResults').addEventListener('click', () => setOverView(false));
+  $('obAgain').addEventListener('click', () => act('again'));
+  const shop = window.ShopUI.create($('shopBody'), act, () => { shopOpen = false; refresh(); });
+
+  // ---------------------------------------------------------------- render state
+  function show(el, on) { el.classList.toggle('show', !!on); }
+  // DOM writes only when a value actually changes (each write can cost the phone a layout pass)
+  const setT = (el, v) => { v = String(v); if (el._t !== v) { el._t = v; el.textContent = v; } };
+  const setS = (el, k, v) => { const kk = '_s' + k; if (el[kk] !== v) { el[kk] = v; el.style[k] = v; } };
+  const setN = (n, v) => { if (n.nodeValue !== v) n.nodeValue = v; };
+  let wasAiming = false;
+  function refresh() {
+    if (!joined) return;
+    const live = open && hostUp && st;
+    lockQbar();
+    const aimingNow = !!(st && st.aimLev);
+    if (aimingNow && !wasAiming) toast('Aim it with your RIGHT thumb. It locks in 10 s (or tap PLACE).', 'info', 4500);
+    wasAiming = aimingNow;
+    show($('waitCover'), !live);
+    show($('gearCover'), gearOpen);
+    if (!live) {
+      setT($('waitTxt'), open ? 'Joining the game...' : 'Lost connection - retrying. Stay on the same Wi-Fi as the computer running the game.');
+      show($('lobbyCover'), false); show($('overCover'), false); show($('shopCover'), false); show($('downCover'), false);
+      document.body.classList.remove('building');
+      return;
+    }
+    const game = mode === 'game';
+    const inGame = st.phase === 'day' || st.phase === 'night';
+    if (!inGame || st.down) shopOpen = false;
+    show($('lobbyCover'), st.phase === 'lobby');
+    show($('overCover'), st.phase === 'over' && !overView);
+    const canView = game && !!R;
+    setS($('viewBtn'), 'display', canView ? '' : 'none'); setS($('replayBtn'), 'display', canView ? '' : 'none');
+    if (st.phase !== 'over' && overView) { overView = false; $('overBar').classList.remove('show'); }
+    show($('downCover'), inGame && st.down);
+    show($('shopCover'), shopOpen);
+    const pausedNow = !!st.paused && inGame;
+    if (pausedNow && !$('pauseCover').classList.contains('show')) $('pauseIntel').innerHTML = window.ShopUI.intelHtml(st.forecast);
+    show($('pauseCover'), pausedNow);
+    setS($('gPause'), 'display', inGame ? '' : 'none');
+    setS($('speedSeg'), 'display', inGame ? '' : 'none');
+    document.querySelectorAll('[data-spd]').forEach((b) => b.classList.toggle('on', +b.dataset.spd === (st.speed || 1)));
+    setS($('gQuit'), 'display', inGame ? '' : 'none');
+    setS($('gSave'), 'display', inGame ? '' : 'none');
+    const sn = $('staleNote');
+    if (st.v !== PROTO) { sn.textContent = 'This page is out of date. Reload it to update.'; show(sn, true); }
+    else if (game && performance.now() - lastWorld > 2500) { sn.textContent = 'Waiting for the game picture... if this stays, reload this page.'; show(sn, true); }
+    else show(sn, false);
+    if (st.phase === 'lobby') {
+      // the waiting room: who is here, who is ready; only the host gets the settings and START
+      const ro = $('roster'), roster = st.roster || [], host = !!st.host, sig = JSON.stringify(roster) + st.leader + host;
+      const lead = roster.find((r) => r.id === st.leader), nReady = roster.filter((r) => r.ready).length;
+      if (ro.dataset.sig !== sig) {
+        ro.dataset.sig = sig; ro.textContent = '';
+        const seen = lobbySeen; lobbySeen = new Set(roster.map((r) => r.id));
+        for (const r of roster) {
+          const row = document.createElement('div'); row.className = 'pr' + (r.ready ? ' ready' : '') + (r.id === id ? ' me' : '') + (seen && !seen.has(r.id) ? ' new' : '');
+          const dot = document.createElement('i'); dot.style.background = r.color; dot.style.boxShadow = '0 0 8px ' + r.color; row.appendChild(dot);
+          const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name + (r.id === id ? ' (you)' : '');
+          const sm = document.createElement('small');
+          if (r.id === st.leader) { const b = document.createElement('b'); b.textContent = '★ HOST · '; sm.appendChild(b); }
+          sm.appendChild(document.createTextNode(r.dev)); nm.appendChild(sm); row.appendChild(nm);
+          const ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = r.ready ? 'READY ✓' : 'not ready'; row.appendChild(ok);
+          if (host && r.id !== id) {
+            if (r.id !== st.leader) {
+              const c = document.createElement('button'); c.className = 'crown'; c.textContent = '★'; c.title = 'Make ' + r.name + ' the host';
+              c.addEventListener('click', () => act('makeHost', r.id)); row.appendChild(c);
+            }
+            const x = document.createElement('button'); x.className = 'kick'; x.textContent = '✕';
+            x.addEventListener('click', () => act('kick', r.id)); row.appendChild(x);
+          }
+          ro.appendChild(row);
+        }
+        if (roster.length < 2) { const e = document.createElement('div'); e.className = 'pr open'; e.textContent = 'Waiting for friends...'; ro.appendChild(e); }
+      }
+      const me = roster.find((r) => r.id === id);
+      const iLead = st.leader === id;
+      setS($('lReady'), 'display', iLead ? 'none' : '');
+      $('lReady').classList.toggle('on', !!(me && me.ready));
+      setT($('lReady'), me && me.ready ? "READY ✓  (tap to undo)" : 'TAP WHEN READY');
+      setS($('diffSeg'), 'display', host ? '' : 'none');
+      setS($('devTogSeg'), 'display', host ? '' : 'none');
+      if (!host && $('pterm').classList.contains('show')) { $('pterm').classList.remove('show'); $('termToggle').classList.remove('on'); }
+      setS($('startBtn'), 'display', host ? '' : 'none');
+      setT($('diffRO'), host ? '' : 'Difficulty: ' + ((GD.DIFFICULTY[st.diff] || {}).name || st.diff));
+      const all = nReady === roster.length;
+      $('startBtn').classList.toggle('all', all && roster.length > 1);
+      setT($('startBtn'), roster.length > 1 && !all ? 'NEW GAME  (' + nReady + '/' + roster.length + ' ready)' : 'NEW GAME');
+      const newest = host && st.saves && st.saves[0], rb = $('resumeRunBtn');
+      setS(rb, 'display', newest ? '' : 'none');
+      const rsig = newest ? newest.id + newest.at : '';
+      if (newest && rb.dataset.sig !== rsig) {
+        rb.dataset.sig = rsig; rb.textContent = 'RESUME GAME';
+        const sm = document.createElement('small');
+        sm.textContent = newest.label.replace(/^(Autosave|Continue) · /, '') + ' · ' + ((GD.DIFFICULTY[newest.diff] || {}).name || '');
+        rb.appendChild(sm);
+      }
+      if (!$('lobbyHead').firstChild) { const lh = $('lobbyHead'), hb = document.createElement('b'); hb.textContent = location.host; lh.append('Friends join at ', hb); }
+      document.querySelectorAll('#diffSeg [data-d]').forEach((b) => b.classList.toggle('on', b.dataset.d === st.diff));
+      $('devToggle').classList.toggle('on', devOpen || st.devMoney || st.devNight > 1);
+      $('devSeg').classList.toggle('show', devOpen && host);
+      $('devSeg2').classList.toggle('show', devOpen && host);
+      setT($('dMoney'), 'Infinite funds: ' + (st.devMoney ? 'ON' : 'OFF'));
+      $('dMoney').classList.toggle('on', !!st.devMoney);
+      setT($('dWyrm'), 'Bonewyrm every night 10+: ' + (st.devWyrm ? 'ON' : 'OFF'));
+      $('dWyrm').classList.toggle('on', !!st.devWyrm);
+      if (dNightPending !== null && dNightPending === st.devNight) dNightPending = null;
+      setT($('dNight'), 'Start night ' + (dNightPending !== null ? dNightPending : (st.devNight || 1)));
+      renderSaves(host ? st.saves || [] : []);
+      setT($('lobbyTxt'), (host
+        ? (roster.length < 2 ? 'You are the host. Wait for friends to join, then press NEW GAME (or RESUME GAME). ' : all ? 'Everyone is ready. ' : 'Waiting on ' + roster.filter((r) => !r.ready).map((r) => r.name).join(', ') + '. You can start any time. ')
+        : (me && me.ready ? 'You are ready. ' : 'Tap READY when you are set. ') + 'Waiting for ' + (lead ? lead.name : 'the host') + ' to start the game. ')
+        + 'Left thumb moves, right thumb aims and shoots.');
+    }
+    if (st.phase === 'over') {
+      const o = mirror && mirror.meta && mirror.meta.over;
+      $('overTxt').textContent = o
+        ? (o.reason === 'fire' ? 'The horde smashed the campfire. ' : '') + 'Survived ' + o.nights + (o.nights === 1 ? ' night' : ' nights') + '. ' + o.scores.slice().sort((a, b) => b.kills - a.kills).map((x) => x.name + ' ' + x.kills).join(' · ')
+        : 'You put down ' + st.kills + ' zombies.';
+    }
+
+    setS($('dot'), 'background', st.color);
+    setT($('pname'), st.name);
+    const f = Math.max(0, Math.min(1, st.hp / st.maxhp));
+    setS($('hp'), 'width', (f * 100) + '%');
+    setS($('hp'), 'background', f > 0.5 ? '#6ee36a' : f > 0.25 ? '#ffd23f' : '#ff5a4f');
+    setT($('hptxt'), st.hp + ' / ' + st.maxhp);
+    setT($('money'), '$' + GD.fmt(st.money));
+    setT($('shopMoney'), '$' + GD.fmt(st.money));
+    setT($('status'), st.phase === 'day' ? 'Day · night ' + st.night + ' when all ready'
+      : st.phase === 'night' ? 'Night ' + st.night + ' · ' + st.left + ' left' : '');
+    const rb = $('readyBtn');
+    setS(rb, 'display', st.phase === 'day' ? 'block' : 'none');
+    rb.classList.toggle('on', st.ready);
+    setN(rb.firstChild, st.ready ? 'READY ✓' : 'READY');
+    const bb2 = $('buildBtn');
+    setS(bb2, 'display', inGame ? 'block' : 'none');
+    setN(bb2.firstChild, game ? 'BUILD' : 'MOVE');
+    setT(bb2.lastChild, game ? '& move' : 'your builds');
+
+    const w = GD.WEAPONS[st.cur];
+    const low = st.mag <= Math.ceil(st.magMax * 0.25);
+    const wsig = (w ? w.name : '') + '|' + (st.reloading ? 'reloading...' : st.mag + (st.reserve < 0 ? ' / ∞' : ' / ' + st.reserve)) + '|' + (low || st.reloading);
+    if ($('weapon').dataset.sig !== wsig) {
+      $('weapon').dataset.sig = wsig;
+      $('weapon').textContent = '';
+      $('weapon').appendChild(document.createTextNode(w ? w.name : ''));
+      const sp = document.createElement('span');
+      sp.textContent = st.reloading ? 'reloading...' : st.mag + (st.reserve < 0 ? ' / ∞' : ' / ' + st.reserve);
+      if (low || st.reloading) sp.className = 'low';
+      $('weapon').appendChild(sp);
+    }
+
+    const building = inGame && !!st.build && !st.down && !shopOpen && !gearOpen;
+    document.body.classList.toggle('building', building);
+    if (st.build && GD.STRUCTS[st.build]) lastBuild = st.build;
+    show($('buildbar'), building && !game);
+    show($('qbar'), building && game);
+    if (st.build && !game) {
+      const s = GD.STRUCTS[st.build], t = GD.TOOLS[st.build];
+      const bn = $('buildName');
+      const sm = document.createElement('small');
+      let label = 'PLACE';
+      if (st.carry) { bn.textContent = GD.STRUCTS[st.carry].name; sm.textContent = 'aim where it goes'; label = 'DROP'; }
+      else if (s) { bn.textContent = s.name; sm.textContent = '$' + GD.fmt(GD.structCost(st.build, st.perks.engineer || 0)); }
+      else if (st.build === 'move') { bn.textContent = 'Move'; sm.textContent = 'aim at any build'; label = 'PICK UP'; }
+      else { bn.textContent = t.name; sm.textContent = 'aim at a structure'; label = 'SALVAGE'; }
+      bn.appendChild(sm);
+      setT($('placeBtn'), label);
+      $('undoBtn').disabled = !st.undo && !st.carry;
+      setT($('doneBtn'), st.carry ? 'PUT BACK' : 'DONE');
+    }
+    if (building && game) {
+      const eng = st.perks.engineer || 0;
+      document.querySelectorAll('#qitems .qi').forEach((b) => {
+        const k = b.dataset.b;
+        b.classList.toggle('on', st.build === k);
+        if (GD.STRUCTS[k]) {
+          const c = GD.structCost(k, eng);
+          b.classList.toggle('cant', c > st.money);
+          setT(b.querySelector('[data-cost]'), '$' + GD.fmt(c));
+        }
+      });
+      $('qUndo').disabled = !st.undo && !st.carry;
+      setT($('qhint'), st.carry ? 'Moving ' + GD.STRUCTS[st.carry].name + ': tap where it goes, then press the green button'
+        : st.build === 'move' ? 'Tap any build to pick it up'
+        : st.build === 'sell' ? 'Tap a build to salvage it for cash'
+        : 'Tap to preview' + (PAINT[st.build] ? ', drag for a line' : '') + ', then press the green button  ·  tap any build to move it');
+      setT($('qDone'), st.carry ? 'PUT BACK' : 'DONE');
+    }
+    if (shopOpen) shop.update(st);
+    updateBuildUi();
+  }
+
+  // ---------------------------------------------------------------- game view frame loop
+  let lastT = performance.now(), miniAt = 0, padAt = 0, padGoal = { t: 0, b: 0, l: 0, r: 0 };
+  // How far the camera may slide past each map edge: enough that the top buttons and the build tray
+  // sit over empty ground beyond the map instead of over cells you want to build on.
+  function camPadGoal() {
+    const vh = window.innerHeight, g = { t: 0, b: 0, l: 0, r: 0 };
+    const top = (el) => { const r = el.getBoundingClientRect(); return r.height ? r.top : vh; };
+    const bot = (el) => { const r = el.getBoundingClientRect(); return r.height ? r.bottom : 0; };
+    g.t = Math.max(bot($('bl')), bot($('br')), bot($('bar'))) + 6;
+    if (document.body.classList.contains('building')) {
+      g.b = vh - top($('qbar')) + 6;                                     // the build tray
+      g.l = $('zl').getBoundingClientRect().right + 4;                   // the move stick (bottom-left)
+    }
+    return g;
+  }
+  function drawMini() {
+    const c = $('mini'), g = c.getContext('2d'), k = c.width / GD.W;
+    g.clearRect(0, 0, c.width, c.height);
+    g.fillStyle = 'rgba(160,170,185,0.8)';
+    for (const s of mirror.structs) g.fillRect(s.cx * GD.CELL * k, s.cy * GD.CELL * k, GD.CELL * k, GD.CELL * k);
+    g.fillStyle = '#ff9d3c'; g.beginPath(); g.arc(980 * k, 540 * k, 4, 0, 7); g.fill();
+    g.fillStyle = '#ff4a40';
+    const pitchMini = mirror.phase === 'night' && mirror.forecast && mirror.forecast.dark;
+    for (const z of mirror.zombies) { if (pitchMini && !(z.vis > 0.3)) continue; const r = z.type === 'boss' || z.type === 'gorewyrm' ? 6 : z.type === 'wyrm' ? 5 : z.type === 'goreseg' ? 4.5 : z.type === 'brute' || z.type === 'wyrmseg' ? 4 : 2.5; g.fillRect(z.x * k - r / 2, z.y * k - r / 2, r, r); }
+    for (const p of mirror.players) {
+      g.fillStyle = p.color; g.beginPath(); g.arc(p.x * k, p.y * k, p.id === id ? 5 : 4, 0, 7); g.fill();
+      if (p.id === id) { g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.stroke(); }
+    }
+    g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 1;
+    g.strokeRect(R.camX * k, R.camY * k, R.viewW * k, R.viewH * k);
+  }
+  function frame(now) {
+    requestAnimationFrame(frame);
+    let dt = (now - lastT) / 1000;
+    lastT = now;
+    if (dt > 0.1) dt = 0.1;
+    if (!joined || mode !== 'game' || !R || !mirror || !st || !open || !hostUp) return;
+    const am = Math.hypot(input.ax, input.ay), w = GD.WEAPONS[st.cur];
+    let speed = 190 * (1 + 0.07 * (st.perks.agility || 0));
+    if (am > 0.5 && !st.build && w && w.slowFire && st.mag > 0 && !st.reloading) speed *= w.slowFire;
+    mirror.step(dt, now / 1000, { mx: input.mx, my: input.my, aim: am > 0.18 ? Math.atan2(input.ay, input.ax) : null, speed, frozen: frozen() });
+    let view = mirror;
+    if (rmirror) {
+      for (const e of replay.step(now / 1000)) { R.handle(e, rmirror); if (sound) AudioFX.event(e); }
+      if (replay.playing) { rmirror.step(dt, now / 1000); view = rmirror; $('replayFill').style.width = (replay.progress * 100).toFixed(1) + '%'; }
+      else stopReplay();
+    }
+    if (now - padAt > 150) { padAt = now; padGoal = camPadGoal(); }
+    const cp = R.camPad || (R.camPad = { t: 0, b: 0, l: 0, r: 0 }), ease = Math.min(1, dt * 8);
+    for (const k in cp) cp[k] += (padGoal[k] - cp[k]) * ease;
+    // after the fire went out, look at the fire (that is where it happened); otherwise follow your survivor
+    const ov = st.phase === 'over' && mirror.meta && mirror.meta.over;
+    const f = ov && ov.reason === 'fire' ? { x: window.SIM.FIRE.x, y: window.SIM.FIRE.y } : view.focus();
+    R.setCam(f.x, f.y);
+    R.autoRes(now);
+    R.updateFx(dt, view);
+    R.safeRender(view, { hud: false, grid: document.body.classList.contains('building'), pending: pending ? { id: pending.id, cells: pending.cells, gun: null } : null, selected: selStruct() });
+    if (selected) placePopup();
+    if (pending && pending.cells && pending.cells.length) {
+      // keep the green PLACE button off the cells being previewed: jump to the top if they are low down
+      let low = 0;
+      for (const c of pending.cells) low = Math.max(low, ((c[1] + 1) * GD.CELL - R.camY) * R.cssScale);
+      $('cbar').classList.toggle('top', low > window.innerHeight - 200);
+    }
+    if (now - miniAt > 200) { miniAt = now; drawMini(); }
+  }
+  window.addEventListener('resize', () => { if (R) R.resize(); });
+
+  // stop iOS pinch / double-tap zoom and rubber-banding
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // saved games (main menu)
+  let delAsk = '';
+  function renderSaves(list) {
+    const box = $('pslist'), sig = JSON.stringify(list) + delAsk;
+    $('psaves').classList.toggle('show', list.length > 0);
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig; box.textContent = '';
+    for (const sv of list) {
+      const row = document.createElement('div'); row.className = 'srow';
+      const b = document.createElement('button'); b.className = 'ld';
+      const d = new Date(sv.at);
+      b.textContent = sv.label;
+      const sm = document.createElement('small');
+      sm.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + ' · ' + (sv.names || []).join(', ');
+      b.appendChild(sm);
+      b.addEventListener('click', () => act('load', sv.id));
+      const x = document.createElement('button'); x.className = 'dl' + (delAsk === sv.id ? ' sure' : '');
+      x.textContent = delAsk === sv.id ? 'Delete?' : '✕';
+      x.addEventListener('click', () => { if (delAsk === sv.id) { delAsk = ''; act('delSave', sv.id); } else delAsk = sv.id; renderSaves(list); });
+      row.appendChild(b); row.appendChild(x);
+      box.appendChild(row);
+    }
+  }
+  $('gSave').addEventListener('click', () => act('save'));
+  $('pSave').addEventListener('click', () => act('save'));
+
+
+  // ---- sound style pickers (this device): click a gun style to hear a volley, a music style to hear its night
+  function buildStylePickers(gunBox, musBox, descEl, btnCls) {
+    const draw = () => {
+      for (const [box, list, cur, kind] of [[gunBox, AudioFX.gunStyles, AudioFX.getGunStyle(), 'gun'], [musBox, AudioFX.musicStyles, AudioFX.getMusicStyle(), 'mus']]) {
+        box.textContent = '';
+        for (const o of list) {
+          const b = document.createElement('button');
+          b.className = btnCls + (o.id === cur ? ' on' : '');
+          b.textContent = o.name; b.title = o.desc;
+          b.addEventListener('click', () => {
+            if (kind === 'gun') { AudioFX.setGunStyle(o.id); AudioFX.previewGuns(o.id); }
+            else AudioFX.previewMusic(o.id, 'night', true);
+            draw();
+          });
+          box.appendChild(b);
+        }
+        if (kind === 'mus') {
+          for (const md of ['day', 'night']) {
+            const b = document.createElement('button');
+            b.className = btnCls + ' small'; b.textContent = '▶ hear ' + md;
+            b.addEventListener('click', () => AudioFX.previewMusic(null, md));
+            box.appendChild(b);
+          }
+        }
+      }
+      const g = AudioFX.gunStyles.find((o) => o.id === AudioFX.getGunStyle()), m = AudioFX.musicStyles.find((o) => o.id === AudioFX.getMusicStyle());
+      descEl.textContent = 'Guns · ' + g.name + ': ' + g.desc + '\nMusic · ' + m.name + ': ' + m.desc;
+    };
+    draw();
+    return draw;
+  }
+  buildStylePickers($('gunStyles'), $('musicStyles'), $('styleDesc'), '');
+  setSound(sound);
+  setMusicPref(musicPref);
+  // volume sliders (this device only)
+  document.querySelectorAll('[data-vol]').forEach((el) => {
+    el.value = Math.round(AudioFX.getVolumes()[el.dataset.vol] * 100);
+    el.addEventListener('input', () => {
+      AudioFX.init();
+      const v = {}; v[el.dataset.vol] = el.value / 100;
+      AudioFX.setVolumes(v);
+      document.querySelectorAll('[data-vol="' + el.dataset.vol + '"]').forEach((o) => { if (o !== el) o.value = el.value; });
+      if (el.dataset.vol !== 'music') AudioFX.play('build');
+    });
+  });
+
+  setMode(mode, true);
+  connect();
+  requestAnimationFrame(frame);
+  window.__pad = { get R() { return R; }, get mirror() { return mirror; }, get st() { return st; } };
+})();
+</script>
+</body>
+</html>

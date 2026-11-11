@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Ember · Sound test</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #0b0d12; color: #e8ecf1; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  body { padding: 20px 16px 60px; box-sizing: border-box; }
+  main { max-width: 1000px; margin: 0 auto; }
+  h1 { margin: 0; font: 900 38px Impact, "Arial Black", sans-serif; letter-spacing: 0.05em; color: #ffb54a; }
+  .sub { margin: 4px 0 18px; color: #96a0ac; }
+  .sub a { color: #ffb54a; }
+  h2 { margin: 26px 0 4px; font-size: 20px; }
+  .hint { margin: 0 0 12px; color: #96a0ac; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .card { background: #161a22; border: 2px solid #2c3340; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .card.cur { border-color: #ffb54a; }
+  .card.playing { border-color: #4fb4ff; box-shadow: 0 0 0 1px #4fb4ff inset; }
+  .card h3 { margin: 0; font-size: 17px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .badge { font-size: 11px; font-weight: 800; color: #1a1408; background: #ffb54a; border-radius: 6px; padding: 2px 6px; }
+  .card p { margin: 0; color: #a9b2bd; font-size: 13.5px; line-height: 1.35; flex: 1; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { font: inherit; font-weight: 700; font-size: 14px; padding: 9px 12px; border-radius: 9px; border: 1px solid #3a4352; background: #262d39; color: #e8ecf1; cursor: pointer; }
+  button:hover { border-color: #6a7686; }
+  button.play { background: #1f4a6a; border-color: #4fb4ff; }
+  button.use { background: #3a3222; border-color: #ffb54a; color: #ffb54a; }
+  button.mini { font-size: 12px; padding: 6px 8px; color: #c2cad4; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .now { position: sticky; top: 0; z-index: 2; margin: 0 -16px; padding: 10px 16px; background: rgba(11,13,18,0.94); border-bottom: 1px solid #2c3340; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .now span { flex: 1; color: #c2cad4; font-size: 14px; min-width: 200px; }
+  label.vol { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #c2cad4; }
+  label.vol input { width: 140px; accent-color: #ffb54a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SOUND TEST</h1>
+  <p class="sub">Hear every gun and music style. Previews don't change anything until you press <b>Use this</b>, which saves it for this device.
+    <a href="/screen">Back to the game</a></p>
+  <div class="now">
+    <span id="nowTxt">Click any ▶ button. (Browsers only allow sound after a click.)</span>
+    <label class="vol">Volume <input type="range" min="0" max="100" id="vol"></label>
+    <button id="stop">■ Stop music</button>
+  </div>
+
+  <h2>Gun sounds</h2>
+  <p class="hint">▶ Volley fires a pistol, rifle burst, shotgun, sniper, SMG burst and a turret burst. The small buttons play one shot.</p>
+  <div class="grid" id="guns"></div>
+
+  <h2>Music</h2>
+  <p class="hint">Each preview plays 20 seconds. Night previews play at full tension; the boss buttons add what plays when an Abomination is out.</p>
+  <div class="grid" id="music"></div>
+</main>
+<script src="/js/data.js"></script>
+<script src="/js/audio.js"></script>
+<script>
+(function () {
+  'use strict';
+  const A = window.AudioFX, $ = (id) => document.getElementById(id);
+  const GUNS = [['pistol', 'Pistol'], ['smg', 'SMG'], ['shotgun', 'Shotgun'], ['rifle', 'Rifle'], ['sniper', 'Sniper'], ['minigun', 'Minigun'],
+    ['turret', 'Turret'], ['launcher', 'Grenade'], ['cannon', 'Mortar']];
+  let playingGun = '';
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
+  const btn = (cls, txt, fn) => { const b = el('button', cls, txt); b.addEventListener('click', fn); return b; };
+  function say(t) { $('nowTxt').textContent = t; }
+
+  function drawGuns() {
+    const box = $('guns'); box.textContent = '';
+    for (const s of A.gunStyles) {
+      const c = el('div', 'card' + (s.id === A.getGunStyle() ? ' cur' : '') + (s.id === playingGun ? ' playing' : ''));
+      const h = el('h3', '', s.name); if (s.id === A.getGunStyle()) h.appendChild(el('span', 'badge', 'IN USE'));
+      c.appendChild(h); c.appendChild(el('p', '', s.desc));
+      const row = el('div', 'btns');
+      row.appendChild(btn('play', '▶ Volley', () => {
+        A.previewGuns(s.id); playingGun = s.id; say('Gun sounds: ' + s.name + ' volley'); drawGuns();
+        setTimeout(() => { if (playingGun === s.id) { playingGun = ''; drawGuns(); } }, 5600);
+      }));
+      row.appendChild(btn('use', s.id === A.getGunStyle() ? 'In use' : 'Use this', () => { A.setGunStyle(s.id); say('Gun sounds set to ' + s.name + ' on this device.'); drawGuns(); }));
+      c.appendChild(row);
+      const one = el('div', 'btns');
+      for (const [g, n] of GUNS) one.appendChild(btn('mini', n, () => A.previewGun(s.id, g)));
+      c.appendChild(one);
+      box.appendChild(c);
+    }
+  }
+  function drawMusic() {
+    const box = $('music'); box.textContent = '';
+    const pv = A.previewing();
+    for (const s of A.musicStyles) {
+      const playing = pv && pv.style === s.id;
+      const c = el('div', 'card' + (s.id === A.getMusicStyle() ? ' cur' : '') + (playing ? ' playing' : ''));
+      const h = el('h3', '', s.name); if (s.id === A.getMusicStyle()) h.appendChild(el('span', 'badge', 'IN USE'));
+      c.appendChild(h); c.appendChild(el('p', '', s.desc));
+      const row = el('div', 'btns');
+      for (const [mode, label] of [['day', '▶ Day'], ['night', '▶ Night']]) {
+        row.appendChild(btn('play', label, () => { A.setMusic({ mode: 'menu', intensity: 0.7 }); A.previewMusic(s.id, mode, false, 20); say('Music: ' + s.name + ' · ' + mode); drawMusic(); }));
+      }
+      row.appendChild(btn('mini', '▶ Night + boss', () => { A.setMusic({ mode: 'night', intensity: 0.9, boss: true, blood: false }); A.previewMusic(s.id, 'night', false, 20); say('Music: ' + s.name + ' · boss night'); drawMusic(); }));
+      row.appendChild(btn('use', s.id === A.getMusicStyle() ? 'In use' : 'Use this', () => { A.setMusicStyle(s.id); say('Music set to ' + s.name + ' on this device.'); drawMusic(); }));
+      c.appendChild(row);
+      box.appendChild(c);
+    }
+  }
+  // outside a preview, play nothing (the page is not a game screen)
+  A.setMusic({ mode: 'menu', intensity: 0 });
+  $('stop').addEventListener('click', () => { A.stopPreview(); A.setMusicOn(false); say('Music stopped.'); drawMusic(); });
+  $('vol').value = Math.round(A.getVolumes().master * 100);
+  $('vol').addEventListener('input', () => { A.init(); A.setVolumes({ master: $('vol').value / 100 }); });
+  // every preview needs music on; stop it again when the preview ends so the menu music does not carry on
+  let wasPlaying = false;
+  setInterval(() => {
+    const pv = A.previewing();
+    if (pv) { A.setMusicOn(true); wasPlaying = true; }
+    else if (wasPlaying) { wasPlaying = false; A.setMusicOn(false); say('Preview finished.'); drawMusic(); }
+  }, 300);
+  A.setMusicOn(false);
+  drawGuns(); drawMusic();
+})();
+</script>
+</body>
+</html>

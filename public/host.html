@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Ember</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0d12%27/%3E%3Cpath d=%27M16 4c2 6 8 8 8 15a8 8 0 0 1-16 0c0-4 3-5 4-9 2 2 3 3 4-6z%27 fill=%27%23ff8a2c%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/shop.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: #e8ecf1; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  canvas#game { position: fixed; inset: 0; display: block; cursor: crosshair; }
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 3vh 3vw; }
+  .overlay.show { display: flex; }
+  #lobby { background: radial-gradient(ellipse at 50% 55%, rgba(10,8,6,0.35) 0%, rgba(4,4,8,0.9) 75%); flex-direction: column; gap: 1.6vh; justify-content: safe center; overflow-y: auto; padding-top: 2vh; padding-bottom: 2vh; }
+  #lobby h1 { font-size: clamp(40px, 7.5vh, 96px); line-height: 1; flex: none; }
+  #lobby > * { flex: none; }
+  #lobby.show ~ #toast { bottom: 10px; z-index: 6; }
+  h1 { margin: 0; font: 900 clamp(48px, 9vh, 110px) Impact, "Arial Black", sans-serif; letter-spacing: 0.06em; color: #ffb54a; text-shadow: 0 0 40px rgba(255,120,30,0.55), 0 4px 0 #5a2a08; }
+  .tag { margin: -1.4vh 0 0; color: #c9b9a4; font-size: clamp(14px, 2.2vh, 22px); }
+  .cols { display: flex; gap: 2.4vw; align-items: stretch; max-width: 1200px; width: 100%; justify-content: center; }
+  .panel { background: rgba(14,16,22,0.88); border: 1px solid #2c333f; border-radius: 16px; padding: 2.2vh 1.8vw; }
+  .join { display: flex; gap: 1.6vw; align-items: center; flex: 1.2; }
+  .join img { width: min(22vh, 230px); height: min(22vh, 230px); border-radius: 12px; background: #fff; padding: 8px; flex: none; }
+  .join h2, .roster h2 { margin: 0 0 1vh; font-size: clamp(16px, 2.6vh, 26px); color: #fff; }
+  .join ol { margin: 0; padding-left: 1.3em; color: #c2cad4; font-size: clamp(13px, 2vh, 19px); line-height: 1.55; }
+  .url { display: inline-block; margin-top: 1vh; padding: 6px 12px; border-radius: 8px; background: #0a0c10; border: 1px solid #3a4352; color: #ffd23f; font: 700 clamp(15px, 2.5vh, 24px) ui-monospace, Consolas, monospace; user-select: all; }
+  .roster { flex: 1.5; display: flex; flex-direction: column; min-width: 300px; }
+  .rhead { display: flex; align-items: baseline; gap: 12px; margin-bottom: 1.2vh; }
+  .rhead h2 { margin: 0; }
+  #pcount { color: #ffb54a; font-weight: 800; font-size: clamp(14px, 2.2vh, 22px); }
+  #plist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1vh 0.8vw; }
+  #plist li { position: relative; display: flex; align-items: center; gap: 0.8vw; padding: 0.9vh 0.8vw; min-height: 6.6vh; background: #161a22; border: 2px solid #232a35; border-radius: 12px; min-width: 0; }
+  #plist li.new { animation: arrive 0.9s ease-out; }
+  @keyframes arrive { 0% { transform: scale(0.85); opacity: 0; } 40% { transform: scale(1.04); opacity: 1; border-color: #ffb54a; } 100% { transform: scale(1); } }
+  #plist li.ready { border-color: #3d8a4e; background: #142219; }
+  #plist .av { width: 5vh; height: 5vh; min-width: 34px; min-height: 34px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font: 900 clamp(15px, 2.6vh, 26px) Impact, "Arial Black", sans-serif; color: rgba(0,0,0,0.65); box-shadow: 0 0 14px currentColor; }
+  #plist .who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  #plist .pn { font-weight: 800; font-size: clamp(14px, 2.3vh, 21px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #plist .pd { color: #7d8794; font-weight: 600; font-size: clamp(11px, 1.6vh, 14px); white-space: nowrap; }
+  #plist .tagh { color: #ffd23f; font-weight: 800; }
+  #plist .stt { flex: none; padding: 4px 9px; border-radius: 999px; font-weight: 800; font-size: clamp(11px, 1.6vh, 14px); background: #262d39; color: #8e98a5; }
+  #plist li.ready .stt { background: #2f6b3c; color: #fff; }
+  #plist .acts { position: absolute; top: 4px; right: 4px; display: none; gap: 4px; }
+  #plist li:hover .acts { display: flex; }
+  #plist li:hover .stt { visibility: hidden; }
+  #plist .acts button { height: 28px; padding: 0 8px; border-radius: 7px; border: 1px solid #3a4352; background: #262d39; color: #aeb6c0; font-size: 12px; font-weight: 700; }
+  #plist .acts .kick:hover { background: #5a1a14; color: #ffd0cc; border-color: #ff5a4f; }
+  #plist .acts .crown:hover { background: #3a3222; color: #ffd23f; border-color: #ffb54a; }
+  #plist li.open { background: transparent; border: 2px dashed #2c333f; color: #4f5866; font-weight: 700; font-size: clamp(12px, 1.9vh, 17px); justify-content: center; }
+  #plist li.open.next { color: #8e98a5; border-color: #4a5260; }
+  #plist li.open.next::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #ffb54a; animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: 0.2; } }
+  #lobbyStatus { margin: 1.4vh 0 0; text-align: center; color: #c9b9a4; font-size: clamp(13px, 2vh, 18px); min-height: 1.4em; }
+  .wsub { margin: -1.2vh 0 0; font: 800 clamp(14px, 2.4vh, 24px) "Segoe UI", sans-serif; letter-spacing: 0.4em; color: #c9b9a4; }
+  .left { flex: 0 1 40%; max-width: 40%; display: flex; flex-direction: column; gap: 1.6vh; min-width: 0; }
+  .left .join > div { min-width: 0; }
+  .left .join { flex: none; }
+  #saves.panel { padding: 1.6vh 1.4vw; }
+  #lobby .cols { max-width: min(1500px, 100%); }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: min(1500px, 100%); width: 100%; padding: 1.4vh 1.4vw; }
+  .bar .grp { display: flex; gap: 6px; align-items: center; }
+  .bar .lbl { color: #8e98a5; font-size: clamp(11px, 1.6vh, 14px); font-weight: 700; letter-spacing: 0.08em; margin-right: 2px; }
+  .bar .sp { flex: 1; }
+  .bar .btn.go { flex: 1 1 240px; padding: 12px; }
+  .btn.go.all { animation: glow 1.2s ease-in-out infinite; }
+  .btn.go.resume { background: #1f4a6a; border-color: #4fb4ff; display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.15; }
+  .btn.go.resume small { font-size: 0.55em; font-weight: 600; color: #cfe6ff; }
+  @keyframes glow { 50% { box-shadow: 0 0 28px rgba(255,122,60,0.85); background: #d04f22; } }
+  #kbName { width: 150px; padding: 10px 12px; font: 700 clamp(13px, 1.9vh, 17px) inherit; color: #fff; background: #0d1016; border: 1px solid #3a4352; border-radius: 10px; outline: none; }
+  #kbName:focus { border-color: #ffb54a; }
+  #plist li i { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+  #plist .empty { grid-column: 1 / -1; color: #7d8794; font-weight: 500; background: none; }
+  .row { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+  button { font-family: inherit; cursor: pointer; }
+  .btn { padding: 11px 14px; font-size: clamp(13px, 1.9vh, 17px); font-weight: 700; color: #e8ecf1; background: #262d39; border: 1px solid #3a4352; border-radius: 10px; }
+  .btn.on { background: #3a3222; border-color: #ffb54a; color: #ffb54a; }
+  .btn.go { flex: 1 1 100%; padding: 15px; font-size: clamp(17px, 2.8vh, 26px); background: #b3421e; border-color: #ff7a3c; color: #fff; }
+  .btn.go:disabled { opacity: 0.45; cursor: default; }
+  .keys { color: #8e98a5; font-size: clamp(10px, 1.45vh, 14px); text-align: center; max-width: 1200px; }
+  .keys b { color: #c2cad4; }
+  #over { background: rgba(4,2,2,0.82); flex-direction: column; gap: 2vh; text-align: center; }
+  #over .overbtns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: stretch; }
+  #overBar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: none; gap: 8px; align-items: center; padding: 8px 10px 8px 16px; background: rgba(13,16,22,0.88); border: 1px solid #ff5a4f; border-radius: 12px; z-index: 7; max-width: calc(100vw - 32px); flex-wrap: wrap; }
+  #overBar.show { display: flex; }
+  #overBar .ob-t { color: #ff5a4f; font-weight: 900; letter-spacing: 1px; margin-right: 6px; }
+  #overBar .btn.go { flex: none; padding: 8px 14px; font-size: 15px; }
+  #replayTag { position: fixed; top: 74px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px 8px; background: rgba(0,0,0,0.7); border-radius: 8px; color: #fff; font-weight: 800; letter-spacing: 1px; z-index: 7; pointer-events: none; text-align: center; }
+  #replayTag.show { display: block; }
+  #replayTag .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ff3a2a; margin-right: 8px; animation: glow 1s ease-in-out infinite; }
+  #replayTag .rbar { margin-top: 5px; height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; }
+  #replayTag .rbar i { display: block; height: 100%; width: 0; background: #ff5a4f; }
+  #over h1 { color: #ff5a4f; text-shadow: 0 0 40px rgba(255,40,30,0.5), 0 4px 0 #4a0c08; }
+  #over table { border-collapse: collapse; font-size: clamp(15px, 2.4vh, 22px); margin: 0 auto; }
+  #over td, #over th { padding: 6px 18px; text-align: left; }
+  #over th { color: #8e98a5; font-weight: 600; border-bottom: 1px solid #3a4352; }
+  #kbshop { background: rgba(0,0,0,0.55); }
+  #kbshop .panel { width: min(1000px, 94vw); height: min(680px, 90vh); display: flex; flex-direction: column; }
+  .shead { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; font-size: 18px; font-weight: 700; }
+  .shead .money { color: #ffd23f; }
+  .shead .sp { flex: 1; }
+  #toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); padding: 9px 16px; border-radius: 9px; background: rgba(20,10,10,0.92); border: 1px solid #ff5a4f; color: #ffd0cc; font-weight: 700; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  .gpmenu { position: fixed; bottom: 84px; width: 288px; padding: 10px 12px; background: rgba(13,16,22,0.95); border: 2px solid #3a4352; border-radius: 12px; font-size: 14px; display: none; z-index: 5; }
+  .gpmenu .gph { font-weight: 800; font-size: 15px; }
+  .gpmenu .gpt { text-align: center; font-weight: 800; color: #ffb54a; margin: 4px 0 6px; white-space: pre; }
+  .gpmenu .gpr { display: flex; justify-content: space-between; padding: 3px 7px; border-radius: 6px; white-space: pre; }
+  .gpmenu .gpr span { color: #ffd23f; font-weight: 700; }
+  .gpmenu .gpr.sel { background: #2c3340; outline: 1px solid #ffb54a; }
+  .gpmenu .gpr.dim { opacity: 0.5; }
+  .gpmenu .gpr.on { color: #ffb54a; }
+  .gpmenu .gpn { margin-top: 6px; min-height: 34px; font-size: 12.5px; line-height: 1.35; color: #96a0ac; white-space: pre-line; max-height: 40vh; overflow: hidden; }
+  .gphelp { position: fixed; bottom: 12px; width: 288px; padding: 7px 11px; background: rgba(13,16,22,0.72); border: 1px solid #3a4352; border-left-width: 4px; border-radius: 10px; font-size: 12.5px; color: #c4ccd6; display: none; z-index: 4; pointer-events: none; }
+  .gphelp .gph { font-weight: 800; font-size: 13px; margin-bottom: 3px; }
+  .gphelp .gpk { display: flex; gap: 8px; line-height: 1.45; }
+  .gphelp .gpk b { flex: 0 0 66px; color: #ffb54a; font-weight: 800; }
+  .gpmenu .gpf { margin-top: 4px; font-size: 11.5px; color: #6f7986; white-space: pre; }
+  #saves { display: none; }
+  #saves.show { display: block; }
+  #saves h3 { margin: 0 0 0.8vh; font-size: clamp(13px, 2vh, 18px); color: #a9b2bd; }
+  #slist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 17vh; overflow-y: auto; }
+  #slist li { display: flex; gap: 6px; }
+  #slist .load { flex: 1; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+  #slist .load small { color: #8a94a0; font-weight: 600; font-size: 0.8em; }
+  #slist .load.auto { border-color: #5a6a8a; }
+  #slist .del { flex: none; width: 44px; padding: 0; }
+  #slist .del.sure { background: #5a1a14; border-color: #ff5a4f; color: #ffd0cc; width: auto; padding: 0 10px; }
+  .devrow { flex: 1 1 100%; display: none; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px; border: 1px dashed #5a4a2a; border-radius: 10px; background: rgba(40,32,16,0.5); }
+  .devrow .btn { padding: 8px 11px; }
+  .devn { font-weight: 800; color: #ffd23f; padding: 0 6px; font-size: clamp(13px, 1.9vh, 17px); }
+  #pause { background: rgba(0,0,0,0.72); z-index: 20; }
+  .pausebox { width: min(980px, 94vw); max-height: 92vh; display: flex; flex-direction: column; gap: 1.4vh; }
+  .ph { font-size: clamp(40px, 7vh, 72px) !important; text-align: center; }
+  #pauseSub { text-align: center; margin: -1vh 0 0; }
+  .pintel { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
+  .pintel .shop-body { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); max-height: 52vh; }
+  .pintel .armtitle { font-size: 14px; font-weight: 800; color: #ffb54a; letter-spacing: 0.05em; }
+  .pausebox .row { margin-top: 0; }
+  .pausebox .btn.go { flex: 2 1 260px; }
+  .pausebox #quitBtn { flex: 1 1 200px; }
+  #pauseBtn { position: fixed; top: 34px; right: 16px; width: 40px; height: 34px; display: none; z-index: 4; font: 900 15px "Segoe UI", sans-serif; color: #e8ecf1; background: rgba(20,24,32,0.8); border: 1px solid #3a4352; border-radius: 8px; cursor: pointer; }
+  #speedBtn { position: fixed; top: 34px; right: 62px; min-width: 44px; height: 34px; display: none; z-index: 4; font: 900 14px "Segoe UI", sans-serif; color: #e8ecf1; background: rgba(20,24,32,0.8); border: 1px solid #3a4352; border-radius: 8px; cursor: pointer; padding: 0 8px; }
+  #speedBtn.fast { color: #1a1408; background: #ffb54a; border-color: #ffd28a; }
+  #noServer { background: rgba(0,0,0,0.6); z-index: 30; }
+  #audioPanel { background: rgba(0,0,0,0.6); z-index: 25; }
+  .vols { display: flex; flex-direction: column; gap: 8px; width: min(460px, 90vw); }
+  .vols label { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 14px; color: #c2cad4; }
+  .vols input[type=range] { flex: 1; accent-color: #ffb54a; height: 28px; touch-action: pan-x; }
+  .styles { width: min(560px, 92vw); display: flex; flex-direction: column; gap: 6px; }
+  .styles h3 { margin: 4px 0 0; font-size: 14px; color: #c2cad4; }
+  .styles h3 small { font-weight: 600; color: #7d8794; margin-left: 6px; }
+  .stylegrid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stylegrid .btn { flex: 1 1 120px; padding: 9px 10px; }
+  .stylegrid .btn.small { flex: 0 1 auto; font-size: 13px; color: #9fb0c4; }
+  #styleDesc { margin: 4px 0 0; font-size: 13px; color: #96a0ac; white-space: pre-line; min-height: 2.6em; }
+  #term { position: fixed; left: 16px; bottom: 16px; width: min(560px, calc(100vw - 32px)); display: none; z-index: 8; background: rgba(4,8,4,0.94); border: 1px solid #2f6a2f; border-radius: 8px; font: 13px/1.45 Consolas, "Courier New", monospace; color: #8dff8d; box-shadow: 0 0 24px rgba(0,255,0,0.08); }
+  #term.show { display: block; }
+  #term .th { padding: 5px 10px; border-bottom: 1px solid #1f4a1f; color: #5fd35f; font-weight: 700; letter-spacing: 1px; display: flex; justify-content: space-between; }
+  #term .th span { color: #3c8a3c; font-weight: 400; letter-spacing: 0; }
+  #termOut { max-height: 34vh; overflow-y: auto; padding: 6px 10px; white-space: pre-wrap; }
+  #termOut .cmd { color: #d8ffd8; }
+  .tin { display: flex; gap: 6px; align-items: center; padding: 4px 10px 8px; }
+  .tin input { flex: 1; background: transparent; border: none; outline: none; color: #d8ffd8; font: inherit; caret-color: #8dff8d; }
+  #termBtn { font-family: Consolas, monospace; }
+  #fatal { background: rgba(0,0,0,0.9); font-size: 22px; text-align: center; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="lobby" class="overlay show">
+  <h1>LAST EMBER</h1>
+  <p class="wsub">WAITING ROOM</p>
+  <div class="cols">
+   <div class="left">
+    <div class="panel join">
+      <img id="qr" alt="QR code to join" src="/qr.svg">
+      <div>
+        <h2>Grab your phone</h2>
+        <ol>
+          <li>Connect to the <b>same Wi-Fi</b> as this computer</li>
+          <li>Scan the code with your camera, or open</li>
+        </ol>
+        <span class="url" id="url">...</span>
+        <ol start="3"><li>Type a name and join. Your phone shows the game too, so this screen is optional.</li></ol>
+      </div>
+    </div>
+    <div class="panel" id="saves"><h3>Saved games</h3><ul id="slist"></ul></div>
+   </div>
+    <div class="panel roster">
+      <div class="rhead"><h2>Survivors</h2><span id="pcount"></span></div>
+      <ul id="plist"></ul>
+      <p id="lobbyStatus"></p>
+    </div>
+  </div>
+  <div class="panel bar">
+    <div class="grp"><input id="kbName" maxlength="14" placeholder="Your name" autocomplete="off" spellcheck="false"><button class="btn" id="kbBtn">Play on this keyboard</button></div>
+    <div class="grp"><span class="lbl">DIFFICULTY</span><button class="btn" data-diff="easy">Easy</button><button class="btn" data-diff="normal">Normal</button><button class="btn" data-diff="hard">Hard</button></div>
+    <div class="grp"><button class="btn" id="audioBtn">Audio</button><a class="btn" href="/sounds" target="_blank" style="text-decoration:none">Sound test</a><button class="btn" id="devBtn">Dev mode</button><button class="btn" id="termBtn" title="Admin terminal (` key)">&gt;_ Terminal</button></div>
+    <span class="sp"></span>
+    <button class="btn go resume" id="resumeRunBtn" style="display:none"></button>
+    <button class="btn go" id="startBtn" disabled>Waiting for survivors...</button>
+    <div class="devrow" id="devRow">
+      <button class="btn" id="devMoney">Infinite funds: OFF</button>
+      <button class="btn" id="devWyrm">Bonewyrm every night 10+: OFF</button>
+      <button class="btn" id="devMinus5">-5</button><button class="btn" id="devMinus">-1</button>
+      <span class="devn" id="devNight">Start at night 1</span>
+      <button class="btn" id="devPlus">+1</button><button class="btn" id="devPlus5">+5</button>
+    </div>
+  </div>
+  <div class="keys">Keyboard player: <b>WASD</b> move · <b>Mouse</b> aim &amp; shoot · <b>B</b> shop &amp; build · <b>hold + drag</b> to build a line · <b>Right-click</b> any build to move it · <b>R</b> reload · <b>Q / E</b> or wheel swap weapon · <b>Enter</b> ready up · <b>Z</b> undo · <b>N</b> force night start · <b>P</b> pause / quit · <b>M</b> mute · <b>F</b> fullscreen</div>
+  <div class="keys">Gamepads (any number): press <b>A</b> to join · <b>Left stick</b> move · <b>Right stick</b> aim · <b>RT</b> fire · <b>Y</b> shop &amp; build · <b>A</b> place / grab your build · <b>B</b> cancel · <b>X</b> reload · <b>LB / RB</b> swap · <b>Start</b> ready · <b>Back</b> pause</div>
+</div>
+
+<div id="term">
+  <div class="th">ADMIN TERMINAL <span>type help · ` to close</span></div>
+  <div id="termOut"></div>
+  <div class="tin"><b>&gt;</b><input id="termIn" maxlength="80" autocomplete="off" spellcheck="false"></div>
+</div>
+<div id="over" class="overlay">
+  <h1>THE FIRE WENT OUT</h1>
+  <p class="tag" id="overLine"></p>
+  <div class="panel"><table id="overTable"></table></div>
+  <div class="overbtns">
+    <button class="btn" id="viewBtn">View the camp (V)</button>
+    <button class="btn" id="replayBtn">Replay last 3 s (R)</button>
+    <button class="btn go" id="againBtn" style="flex:none;min-width:280px">Back to camp (Enter)</button>
+  </div>
+</div>
+<div id="overBar">
+  <span class="ob-t">THE FIRE WENT OUT</span>
+  <button class="btn" id="obReplay">Replay (R)</button>
+  <button class="btn" id="obResults">Results (V)</button>
+  <button class="btn go" id="obAgain">Back to camp (Enter)</button>
+</div>
+<div id="replayTag"><span class="dot"></span>REPLAY · last 3 seconds<div class="rbar"><i id="replayFill"></i></div></div>
+
+<div id="kbshop" class="overlay">
+  <div class="panel">
+    <div class="shead"><span>Supply crate</span><span class="money" id="kbMoney"></span><span class="sp"></span><button class="btn" id="kbClose">Close (B)</button></div>
+    <div id="kbShopBody" style="flex:1;min-height:0;display:flex;flex-direction:column"></div>
+  </div>
+</div>
+
+<div id="pause" class="overlay">
+  <div class="panel pausebox">
+    <h1 class="ph">PAUSED</h1>
+    <p class="tag" id="pauseSub"></p>
+    <div class="pcols">
+      <div class="shop pintel"><div class="armtitle">TONIGHT'S THREATS</div><div class="shop-body" id="pauseIntel"></div></div>
+    </div>
+    <div class="row">
+      <button class="btn go" id="resumeBtn">RESUME  (P)</button>
+      <button class="btn" id="saveBtn">Save game  (S)</button>
+      <button class="btn" id="quitBtn">Quit to main menu  (Q)</button>
+      <button class="btn" id="pAudioBtn">Audio</button>
+      <button class="btn" id="pDevMoney">Dev: infinite funds OFF</button>
+    </div>
+  </div>
+</div>
+<button id="pauseBtn" title="Pause">II</button>
+<button id="speedBtn" title="Game speed (T)">1×</button>
+
+<div id="audioPanel" class="overlay">
+  <div class="panel" style="display:flex;flex-direction:column;gap:14px;align-items:center;min-width:min(520px,92vw)">
+    <h2 style="margin:0">Audio (this computer)</h2>
+      <div class="vols">
+        <label>Master <input type="range" min="0" max="100" data-vol="master"></label>
+        <label>Music <input type="range" min="0" max="100" data-vol="music"></label>
+        <label>Effects <input type="range" min="0" max="100" data-vol="sfx"></label>
+      </div>
+    <div class="styles">
+      <h3>Gun sounds <small>click to hear a volley</small></h3><div class="stylegrid" id="gunStyles"></div>
+      <h3>Music <small>click to hear its night (14 s)</small></h3><div class="stylegrid" id="musicStyles"></div>
+      <p id="styleDesc"></p>
+      <a href="/sounds" target="_blank" style="color:#ffb54a;font-weight:700;font-size:14px">Open the full sound test page (every gun one by one, day / night / boss music) ↗</a>
+    </div>
+    <div class="row" style="margin:0;width:min(460px,90vw)">
+      <button class="btn" id="aMusic">Music: ON</button><button class="btn" id="aMute">Sound: ON</button><button class="btn" id="aSharp" title="Auto lowers the drawing resolution in heavy fights to keep it smooth">Graphics: Auto</button><button class="btn go" id="aClose" style="flex:1 1 140px">Done</button>
+    </div>
+  </div>
+</div>
+<div id="fatal" class="overlay"><div id="fatalMsg"></div></div>
+<div id="toast"></div>
+<div id="noServer" class="overlay"><div class="panel" style="text-align:center"><h2 style="margin:0 0 8px">Connecting to the game...</h2><p class="tag" style="margin:0">The game runs in the terminal window (npm start). Make sure it is still running.</p></div></div>
+
+<script src="/js/data.js"></script>
+<script src="/js/sim.js"></script>
+<script src="/js/audio.js"></script>
+<script src="/js/render.js"></script>
+<script src="/js/netview.js"></script>
+<script src="/js/shopui.js"></script>
+<script src="/js/host.js"></script>
+</body>
+</html>
