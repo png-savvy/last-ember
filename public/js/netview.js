@@ -48,7 +48,7 @@
       Z.push([z.id, ZT.indexOf(z.type), Math.round(z.x), Math.round(z.y), r2(z.ang),
         (z.hitT > 0 ? 1 : 0) | (z.burn > 0 ? 2 : 0) | (z.lunge > 0.5 ? 4 : 0) | (z.burrowed ? 8 : 0) | (z.leap ? 16 : 0) |
         (z.rage > 0 ? 32 : 0) | (z.charge ? 64 : 0) | (z.lit ? 128 : 0) | (z.raised ? 256 : 0) | (z.stunImm > 0 ? 512 : 0) | (z.chill > 0 ? 1024 : 0) |
-        (z.champ === 'armored' ? 4096 : z.champ === 'swift' ? 8192 : z.champ === 'regen' ? 16384 : 0), Math.ceil(z.hp / z.maxhp * 100), z.leap ? r2(z.air) : z.fly ? 0.55 : z.climb ? 0.3 : 0]);
+        (z.sqz ? 32768 : 0) | (z.champ === 'armored' ? 4096 : z.champ === 'swift' ? 8192 : z.champ === 'regen' ? 16384 : 0), Math.ceil(z.hp / z.maxhp * 100), z.leap ? r2(z.air) : z.fly ? 0.55 : z.climb ? 0.3 : 0]);
     }
     const B = [];
     for (const b of sim.bullets) {
@@ -190,6 +190,7 @@
         z.hitT = (a[5] & 1) ? 0.1 : 0; z.burn = (a[5] & 2) ? 1 : 0;
         if (a[5] & 4) z.lunge = 1;
         z.burrowed = !!(a[5] & 8); z.rage = (a[5] & 32) ? 1 : 0; z.charge = (a[5] & 64) ? 1 : null; z.lit = (a[5] & 128) ? 1 : 0; z.raised = !!(a[5] & 256); z.stunImm = (a[5] & 512) ? 1 : 0; z.chill = (a[5] & 1024) ? 1 : 0;
+        z.sqz = !!(a[5] & 32768);
         z.champ = (a[5] & 4096) ? 'armored' : (a[5] & 8192) ? 'swift' : (a[5] & 16384) ? 'regen' : null;
         z.fair = z.air || 0; z.tair = a[7] || 0;
         z.hp = a[6];

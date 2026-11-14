@@ -306,6 +306,8 @@
         <button data-mode="game">Game on my phone<small>play looking at this screen</small></button>
         <button data-mode="classic">Controller only<small>watch the big screen</small></button>
       </div>
+      <h3>BLOOD &amp; GORE</h3>
+      <div class="seg" id="goreSeg"><button data-gore="2">Full</button><button data-gore="1">Reduced</button><button data-gore="0">Off</button></div>
       <h3>PHONE SOUND</h3>
       <div class="seg" id="gearSound"><button data-snd="1">On</button><button data-snd="0">Off</button></div>
       <h3>MUSIC</h3>
@@ -396,6 +398,7 @@
     if (!b) return false;
     if (pageBuild === null) { pageBuild = b; return false; }
     if (b === pageBuild) return false;
+    if (st && st.phase === 'night' && !st.paused) return false;     // not in the middle of a fight: it loads at dawn
     pageBuild = b;
     location.reload();
     return true;
@@ -810,6 +813,10 @@
   $('gearClose').addEventListener('click', () => { gearOpen = false; refresh(); });
   $('fsBtn').addEventListener('click', fullscreen);
   $('gPause').addEventListener('click', () => { gearOpen = false; act('pause', 1); refresh(); });
+  const goreNow = () => { const g = store.get('le_gore'); return g === null || g === '' ? 2 : +g; };
+  const goreBtns = () => document.querySelectorAll('[data-gore]').forEach((b) => b.classList.toggle('on', +b.dataset.gore === goreNow()));
+  document.querySelectorAll('[data-gore]').forEach((b) => b.addEventListener('click', () => { store.set('le_gore', b.dataset.gore); if (R) R.gore = +b.dataset.gore; goreBtns(); }));
+  goreBtns();
   document.querySelectorAll('[data-spd]').forEach((b) => b.addEventListener('click', () => act('speed', +b.dataset.spd)));
   $('pResume').addEventListener('click', () => act('pause', 0));
   // quitting ends the run for everyone, so it takes two taps

@@ -8,6 +8,7 @@
   const FIRE_HP = 2500;
   const fireMaxFor = (night) => Math.round(FIRE_HP * (1 + 0.12 * (Math.max(1, night) - 1)));
   const TURRET_SET = new Set(GD.TURRET_IDS);
+  const GAP_R = 17, GAP_COST = 3;      // diagonal gaps: zombies up to this radius squeeze through; what the detour is worth
   const newRunId = () => Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
   const PR = 14;                 // player radius
   const HB = 3;                  // spatial hash border (cells) for things outside the map
@@ -252,7 +253,7 @@
         stats: this.stats, nextId: this.nextId, queue: this.queue, spawnT: this.spawnT, spawnGap: this.spawnGap,
         forecast: this.forecast, totalThisNight: this.totalThisNight, activeCount: this.active().length,
         fireHp: this.fireHp, fireMax: this.fireMax, runId: this.runId,
-        players, structs, zombies: this.zombies.filter((z) => !z.dead).map((z) => Object.assign({}, z, { aggro: null })),
+        players, structs, zombies: this.zombies.filter((z) => !z.dead).map((z) => Object.assign({}, z, { aggro: null, sq: null, sqz: false })),
       }));
     }
     // Restore a saved game. People already in the lobby take back their saved survivor (same device or
@@ -945,7 +946,7 @@
         const s = grid[i];
         if (!s) return 0;
         if (GD.STRUCTS[s.id].block) return 3 + s.hp / 45;
-        return s.id === 'wire' ? 0.7 : 0;           // wading through wire at 60% speed costs about 0.7 of a step
+        return s.id === 'wire' ? 0.7 : s.id === 'mud' ? 1 : 0;           // wading through wire at 60% speed costs about 0.7 of a step
       };
       const blocked = (i) => { const s = grid[i]; return !!s && GD.STRUCTS[s.id].block; };
       // Warding Totems push routes away; Blood Trails pull them along (walking a trail costs a third of a step)
@@ -975,8 +976,9 @@
             if (done[ni]) continue;
             let step = 1;
             if (ox && oy) {
-              if (blocked(cy * GW + nx) || blocked(ny * GW + cx) || blocked(ni) || blocked(i)) continue;
-              step = 1.414;
+              const ba = blocked(cy * GW + nx), bb = blocked(ny * GW + cx);
+              if (blocked(ni) || blocked(i) || ba !== bb) continue;
+              step = ba ? 1.414 + GAP_COST : 1.414;     // both blocked: walls touching only at the corner leave a gap
             }
             const nd = d + step * (trail(ni) ? 0.33 : 1) + cellCost(ni) + ward[ni];
             if (nd < flow[ni]) push(ni, nd);
@@ -1067,7 +1069,7 @@
         const m = def.knock === undefined ? 1 : def.knock;
         z.kvx += kx * m; z.kvy += ky * m;
       }
-      if (z.hp <= 0) this.killZombie(z);
+      if (z.hp <= 0) { z.gib = dmg >= z.maxhp * 0.5 || dmg >= 250; this.killZombie(z); }
     }
     // ---- Bonewyrm
     // The head lays a trail of points as it moves; body segment i sits (i + 1) * gap behind it along that trail,
@@ -1194,7 +1196,7 @@
         const amt = Math.round(base / Math.max(1, act.length));
         for (const p of act) { p.money += amt; p.earned += amt; }
       }
-      this.emit('die', { x: z.x, y: z.y, ztype: z.type, r: z.r, burn: z.burn > 0 });
+      this.emit('die', { x: z.x, y: z.y, ztype: z.type, r: z.r, burn: z.burn > 0, gib: !!z.gib, ang: z.ang });
       if (def.seg) this.severWyrm(z);
       else if (def.wyrmHead) this.severWyrm(z);
       if (def.blast) this.explode(z.x, z.y, def.blast, 70, null, 34, 220, 'acid');
@@ -1412,12 +1414,22 @@
               if (!ox && !oy) continue;
               const nx = cx + ox, ny = cy + oy;
               if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
-              if (ox && oy && (this.blockedCell(nx, cy) || this.blockedCell(cx, ny))) continue;
+              if (ox && oy && (this.blockedCell(nx, cy) !== this.blockedCell(cx, ny))) continue;
               const f = flow[ny * GW + nx];
               if (f < best) { best = f; bx = nx; by = ny; }
             }
           }
-          if (bx >= 0) { tx = bx * CELL + CELL / 2; ty = by * CELL + CELL / 2; }
+          if (bx >= 0) {
+            tx = bx * CELL + CELL / 2; ty = by * CELL + CELL / 2;
+            // heading through a diagonal gap between two corner-touching walls
+            if (bx !== cx && by !== cy && this.blockedCell(bx, cy) && this.blockedCell(cx, by)) {
+              const a = this.structAt(bx, cy), b = this.structAt(cx, by);
+              if (a && b) {
+                if (z.r <= GAP_R) z.sq = { a, b, t: 1.5 };                     // small: squeeze through, clawing
+                else if (!z.aggro && !def.wyrmHead && !def.seg) z.aggro = a.hp <= b.hp ? a : b;   // too big: widen it
+              }
+            }
+          }
         }
         const dx = tx - z.x, dy = ty - z.y, d = Math.hypot(dx, dy);
         if (d > 0.5) { dirx = dx / d; diry = dy / d; }
@@ -1546,6 +1558,19 @@
         if (z.dead) return;
       }
       if (z.climb) slow *= 0.4;                      // clambering over a Wyrm Husk
+      if (here && here.id === 'mud' && !z.charge) slow *= z.r > 25 ? 0.8 : 0.5;     // Mud Pit
+      if (z.sq) {                                    // squeezing through a diagonal gap: slow, and it claws both walls
+        if (z.sq.a.dead || z.sq.b.dead || ((z.sq.t -= dt) <= 0 && !z.sqz)) { z.sq = null; z.sqz = false; }
+        else if (z.sqz) {
+          slow *= 0.3;
+          if (z.atkT <= 0 && z.stun <= 0) {
+            z.atkT = 0.7; z.lunge = 1;
+            const A = z.sq.a, B = z.sq.b, dm = Math.max(def.dmg, 8) * 0.5 * this.wallMul(n);
+            this.emit('squeeze', { x: Math.max(A.cx, B.cx) * CELL, y: Math.max(A.cy, B.cy) * CELL });
+            this.damageStruct(A, dm); this.damageStruct(B, dm);
+          }
+        }
+      }
       if (z.chill > 0) slow *= def.stun ? 0.7 : 0.5;   // Frostbite
       let speed = z.speed * slow * (z.rage > 0 ? 1.45 : 1);
       if (z.charge) {
@@ -1575,7 +1600,7 @@
       // walls
       const gx = Math.floor(z.x / CELL), gy = Math.floor(z.y / CELL);
       const span = z.r > CELL * 0.6 ? 2 : 1;
-      let hitS = null, climb = false, touchT = null;
+      let hitS = null, climb = false, touchT = null, sqNow = false;
       const climber = z.r <= 17 && !z.charge && !def.wyrmHead;     // small zombies scramble over carcasses; big ones chew through
       for (let oy = -span; oy <= span; oy++) {
         for (let ox = -span; ox <= span; ox++) {
@@ -1583,6 +1608,11 @@
           if (!s2 || s2.dead || !GD.STRUCTS[s2.id].block) continue;
           if (climber && GD.STRUCTS[s2.id].husk) {
             if (Math.abs(z.x - s2.x) < CELL / 2 + z.r * 0.5 && Math.abs(z.y - s2.y) < CELL / 2 + z.r * 0.5) climb = true;
+            continue;
+          }
+          if (z.sq && (s2 === z.sq.a || s2 === z.sq.b)) {        // squeezing between these two: they do not stop it
+            const qx = clamp(z.x, s2.cx * CELL, s2.cx * CELL + CELL), qy = clamp(z.y, s2.cy * CELL, s2.cy * CELL + CELL);
+            if ((z.x - qx) ** 2 + (z.y - qy) ** 2 < z.r * z.r) sqNow = true;
             continue;
           }
           if (pushOut(z, z.r, s2.cx * CELL, s2.cy * CELL)) {
@@ -1593,7 +1623,7 @@
           }
         }
       }
-      z.climb = climb;
+      z.climb = climb; z.sqz = sqNow;
       // Bumped into a turret, or ran head-on into a wall: lock onto it and tear it down.
       // (The Abomination spares walls, Leapers vault them, wyrms and charges just plough on.)
       if (!z.aggro && !z.charge && z.type !== 'boss' && !def.wyrmHead && !def.seg && !def.raise) {
@@ -1988,6 +2018,19 @@
           this.removeStruct(s, true);
           this.explode(s.x, s.y, 120, 280, s.owner, 0, 0);
         }
+        return;
+      }
+      if (s.id === 'beartrap') {                     // single use: clamps the first zombie that steps on it
+        if (this.time - s.born < 0.5) return;
+        let got = null;
+        this.forNear(s.x, s.y, 50, (z) => { if (!got && !z.fly && !z.leap && !GD.ZOMBIES[z.type].seg && Math.abs(z.x - s.x) < CELL / 2 + z.r * 0.4 && Math.abs(z.y - s.y) < CELL / 2 + z.r * 0.4) got = z; });
+        if (!got) return;
+        const zd = GD.ZOMBIES[got.type];
+        got.stun = Math.max(got.stun, def.hold * (zd.stun ? zd.stun.mul : 1));
+        got.x = s.x; got.y = s.y; got.kvx = 0; got.kvy = 0;
+        this.emit('spikes', { x: s.x, y: s.y });
+        this.removeStruct(s, true);
+        this.damageZombie(got, def.dmg * (1 + 0.07 * (this.night - 1)), s.owner, 0, 0, true);
         return;
       }
       if (s.id === 'spikes') {                       // floor trap: impales whatever is standing on it

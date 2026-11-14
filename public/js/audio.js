@@ -22,8 +22,13 @@
     }
     return buf;
   }
+  const dbg = { inits: 0, plays: 0, played: 0, err: '', resumeErr: '' };
   function init() {
-    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    dbg.inits++;
+    try { initReal(); } catch (e) { dbg.err = String(e && e.message || e).slice(0, 120); }
+  }
+  function initReal() {
+    if (ac) { if (ac.state !== 'running') { const p = ac.resume(); if (p && p.catch) p.catch((e) => { dbg.resumeErr = String(e && e.message || e).slice(0, 120); }); } return; }
     const AC = root.AudioContext || root.webkitAudioContext;
     if (!AC) return;
     ac = new AC();
@@ -430,7 +435,9 @@
   const VOICE_CAP = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '') ? 6 : 10;   // per 0.1 s
   const burst = { t: 0, n: 0 };
   function play(name, x, key) {
+    dbg.plays++;
     if (!ac || muted || ac.state !== 'running') return;
+    dbg.played++;
     const k = key || name, now = ac.currentTime;
     if (last[k] && now - last[k] < (MIN_GAP[k] || 0.02)) return;
     // overall cap: in a huge fight, drop routine sounds instead of choking slower devices
@@ -860,7 +867,10 @@
     try { gunFn(name, style)(dest(sfx, 0, WET[name] || 0.08)); } catch (e) { /* ignore */ }
   }
 
+  // is sound actually coming out? ('none' = not started, 'suspended' = the browser is waiting for a click or key)
+  const audioState = () => (ac ? ac.state : 'none');
   root.AudioFX = {
+    state: audioState,
     gunStyles: list(GUN_STYLES), musicStyles: list(MUSIC_STYLES),
     getGunStyle: () => gunStyle, getMusicStyle: () => musicStyle, setGunStyle, setMusicStyle, previewGuns, previewGun, previewMusic,
     previewing: () => (preview && Date.now() < preview.until ? { style: preview.style, mode: preview.mode, left: (preview.until - Date.now()) / 1000 } : null),
@@ -868,7 +878,8 @@
     init, play, shot, event, setMusic, toggleMute, setMuted, setMusicOn, setVolumes, getVolumes: () => Object.assign({}, vol),
     setClock: (fn) => { clock = fn; },
     isMuted: () => muted, isMusicOn: () => musicOn,
-    debug: () => ({ state: ac ? ac.state : 'none', mode: music.mode, intensity: music.intensity, step: music.nextStep }),
+    debug: () => ({ dbg, muted, musicOn, vol, rate: ac ? ac.sampleRate : 0, t: ac ? +ac.currentTime.toFixed(1) : 0, sink: ac && ac.sinkId !== undefined ? String(ac.sinkId && ac.sinkId.type || ac.sinkId) : '?',
+      gains: master ? [+master.gain.value.toFixed(2), +sfx.gain.value.toFixed(2), +mus.gain.value.toFixed(2)] : null, state: ac ? ac.state : 'none', mode: music.mode, intensity: music.intensity, step: music.nextStep }),
     setAmbient: () => {},     // kept for older callers; the soundtrack replaces the old ambience
   };
 })(window);

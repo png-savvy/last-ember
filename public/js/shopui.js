@@ -61,13 +61,31 @@
 
     // supply drops: only unlocked gear is listed, plus a teaser of what the next crate brings
     const open = (st, id) => GD.unlocked(id, st.night, st.unlockAll);
+    // the next supply drop only, greyed out with its stats and price so you can plan (nothing further ahead is shown)
     function teaser(st, kinds) {
       if (st.unlockAll) return '';
       const nd = GD.nextDrop(st.night);
       if (!nd) return '';
       const ids = nd.ids.filter((id) => kinds(id));
       if (!ids.length) return '';
-      return `<div class="hint teaser">&#128230; <b>Next supply drop after night ${nd.after}:</b> ${ids.map(GD.itemName).join(', ')}</div>`;
+      const eng = st.perks.engineer || 0;
+      let h = `<div class="sechead lockhead">&#128274; NEXT SUPPLY DROP &middot; UNLOCKS NIGHT ${nd.after + 1}</div>`;
+      for (const id of ids) {
+        const w = GD.WEAPONS[id], sd = GD.STRUCTS[id], k = GD.PERKS[id], chips = [];
+        let cost = 0, desc = '';
+        if (w) { cost = w.cost; desc = w.desc; chips.push(Math.round(w.dmg * w.pellets / w.cd) + ' dps', 'mag ' + w.mag, 'range ' + w.range); }
+        else if (sd) {
+          cost = GD.structCost(id, eng); desc = GD.TURRET_INFO[id] || sd.desc; chips.push(sd.hp + ' hp');
+          const rg = GD.turretRange(id); if (rg) chips.push('range ' + rg);
+          if (sd.gun) { const g = GD.WEAPONS[sd.gun], T = GD.GUN_TURRET; chips.push(Math.round(g.dmg * g.pellets * T.dmg * (T.mul[sd.gun] || 1) / (g.cd * T.rate)) + ' dps'); }
+          else if (sd.dmg && sd.cd) chips.push(Math.round(sd.dmg / sd.cd) + ' dps');
+        } else if (k) { cost = GD.perkCost(id, 0); desc = k.desc; }
+        const price = String.fromCharCode(36) + GD.fmt(cost);
+        const tip = (GD.itemName(id) + ' - ' + price + ' - ' + chips.join(', ') + ' - ' + desc).replace(/"/g, '&quot;');
+        h += `<div class="card locked" title="${tip}"><div class="ctop"><b>${GD.itemName(id)}</b><span class="badge lock">Unlocks night ${nd.after + 1}</span></div>` +
+          '<div class="stats">' + chips.map((c) => `<span>${c}</span>`).join('') + `<span class="cost">${price}</span></div><div class="cdesc">${desc}</div></div>`;
+      }
+      return h;
     }
     function weaponsHtml(st) {
       let h = '';

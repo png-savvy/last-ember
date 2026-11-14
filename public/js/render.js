@@ -14,6 +14,28 @@
   }
   const LIGHT_RES = 1 / 4;          // the light map is soft, so a quarter of the resolution is plenty
   // Pre-rendered soft shapes, stamped instead of building gradients every frame.
+  let VOL = null; const ROT = [];
+  function fleshSprites() {
+    if (VOL) return;
+    VOL = mk(64, 64); let g = VOL.getContext('2d');
+    let gr = g.createRadialGradient(28, 26, 6, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,240,220,0.10)'); gr.addColorStop(0.45, 'rgba(0,0,0,0)'); gr.addColorStop(0.8, 'rgba(0,0,0,0.38)'); gr.addColorStop(1, 'rgba(0,0,0,0.72)');
+    g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 32, 0, 6.2832); g.fill();
+    for (let v = 0; v < 4; v++) {
+      const cv = mk(64, 64); g = cv.getContext('2d');
+      g.beginPath(); g.arc(32, 32, 31, 0, 6.2832); g.clip();
+      const tones = ['rgba(40,52,30,', 'rgba(58,30,44,', 'rgba(20,16,12,', 'rgba(70,16,12,', 'rgba(92,88,60,'];      // bruise green, livid purple, grime, raw, pallor
+      for (let i = 0; i < 16; i++) {
+        g.fillStyle = tones[(Math.random() * tones.length) | 0] + (0.16 + Math.random() * 0.3) + ')';
+        const x = Math.random() * 64, y = Math.random() * 64, r = 3 + Math.random() * 10;
+        g.beginPath(); for (let k = 0; k < 7; k++) { const a = k / 7 * 6.2832, rr = r * (0.5 + Math.random() * 0.8); g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.fill();
+      }
+      g.strokeStyle = 'rgba(30,14,34,0.45)'; g.lineWidth = 0.8;                 // dark veins under the skin
+      for (let i = 0; i < 5; i++) { let x = Math.random() * 64, y = Math.random() * 64; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (Math.random() - 0.5) * 16; y += (Math.random() - 0.5) * 16; g.lineTo(x, y); } g.stroke(); }
+      g.fillStyle = 'rgba(0,0,0,0.5)'; for (let i = 0; i < 40; i++) g.fillRect(Math.random() * 64, Math.random() * 64, 1, 1);      // pores and dirt
+      ROT.push(cv);
+    }
+  }
   function glowSprite(rgb) {
     const c = mk(128, 128), g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
     gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(0.5, `rgba(${rgb},0.6)`); gr.addColorStop(1, `rgba(${rgb},0)`);
@@ -34,6 +56,34 @@
   }
 
   const ACIDY = { bloater: 1, splitter: 1, splitling: 1, broodmother: 1 };   // these bleed green-purple goo
+  // Real blood is dark: deep reds and near-black maroons, never bright red. Every stain mixes several of these.
+  const BLOOD = ['#4c0707', '#3c0505', '#2f0404', '#560a09', '#250303', '#420806'];
+  const BILE = ['#2b3312', '#343b16', '#20270d', '#3a3a1a'];        // what the bloated ones leak: dark, sickly
+  const pickOf = (a) => a[(Math.random() * a.length) | 0];
+  // whatever colour a caller asks for, gore comes out of the palettes above
+  function goreCol(c) {
+    if (typeof c !== 'string' || c[0] !== '#' || c.length !== 7) return pickOf(BLOOD);
+    const n = parseInt(c.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    if (g > r && g > b) return pickOf(BILE);
+    if (r > g * 1.5 && r > b * 1.5) return pickOf(BLOOD);
+    return c;
+  }
+  // an irregular blot: a noisy closed curve, never a circle
+  function blot(d, x, y, r, stretch, ang) {
+    const n = 9, pts = [];
+    for (let i = 0; i < n; i++) { const a = i / n * TAU, rr = r * (0.55 + Math.random() * 0.65); pts.push([Math.cos(a) * rr * (stretch || 1), Math.sin(a) * rr]); }
+    d.save(); d.translate(x, y); if (ang !== undefined) d.rotate(ang);
+    d.beginPath();
+    for (let i = 0; i < n; i++) { const p = pts[i], q = pts[(i + 1) % n], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2; if (!i) d.moveTo(mx, my); else d.quadraticCurveTo(p[0], p[1], mx, my); }
+    d.quadraticCurveTo(pts[0][0], pts[0][1], (pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2);
+    d.fill(); d.restore();
+  }
+  // a thrown drop: a teardrop with its tail pointing back the way it came
+  function drop(d, x, y, len, wid, ang) {
+    d.save(); d.translate(x, y); d.rotate(ang);
+    d.beginPath(); d.moveTo(-len, 0); d.quadraticCurveTo(len * 0.2, -wid, len * 0.55, 0); d.quadraticCurveTo(len * 0.2, wid, -len, 0); d.fill();
+    d.restore();
+  }
   const ZLOOK = {
     walker: { body: '#5d7a4a', shirt: '#3d4a5c', head: '#8fa870', arm: '#7b9560', eye: '#ffe28a' },
     runner: { body: '#8a8468', shirt: '#6b3030', head: '#c2b994', arm: '#aaa27e', eye: '#ff5040' },
@@ -61,6 +111,13 @@
     gravecaller: { body: '#2a1e3a', shirt: '#160f22', head: '#d8d0c0', arm: '#3a2c50', eye: '#c08cff' },
     broodmother: { body: '#7a8a34', shirt: '#4e5a20', head: '#a8b85a', arm: '#6a7a2c', eye: '#f0ff80' },
   };
+  for (const k of Object.keys(ZLOOK)) {
+    for (const part of ['body', 'shirt', 'head', 'arm']) {
+      const n = parseInt(ZLOOK[k][part].slice(1), 16), m = [0x62, 0x60, 0x50];                 // dead-flesh grey-olive
+      const ch = [n >> 16, (n >> 8) & 255, n & 255].map((v, i) => Math.round((v * 0.5 + m[i] * 0.5) * (part === 'shirt' ? 0.7 : 0.82)));
+      ZLOOK[k][part] = '#' + ch.map((v) => v.toString(16).padStart(2, '0')).join('');
+    }
+  }
   const GUNLOOK = {
     pistol: { len: 12, w: 4, c: '#2b2e35' }, smg: { len: 17, w: 5, c: '#30343c' }, shotgun: { len: 24, w: 5, c: '#5a3d24' },
     rifle: { len: 26, w: 5, c: '#2a3028' }, sniper: { len: 34, w: 4, c: '#22262c' }, flamer: { len: 24, w: 7, c: '#8a3a1c' },
@@ -99,6 +156,8 @@
       this.texts = [];
       this.banner = null;
       this.shake = 0;
+      this.gore = 2;                      // 2 full, 1 reduced, 0 off (settings; kept per device)
+      try { const g = localStorage.getItem('le_gore'); if (g !== null && g !== '') this.gore = Math.max(0, Math.min(2, +g || 0)); } catch (e) { /* default */ }
       this.dark = 0;
       this.time = 0;
       this.fadeT = 0;
@@ -190,7 +249,7 @@
     // things are smooth again (it used to never climb back, so one heavy fight left the screen blurry until a reload).
     // The first few seconds after loading are ignored (they always stutter). "Always sharp" turns it off.
     autoRes(now) {
-      const a = this.ar || (this.ar = { last: now, gaps: [], t0: now, born: now, vs: 0, good: 0, lvl: 0, dropAt: 0 });
+      const a = this.ar || (this.ar = { last: now, gaps: [], t0: now, born: now, vs: 0, good: 0, bad: 0, lvl: 0, dropAt: 0 });
       const gap = now - a.last;
       a.last = now;
       if (this.sharp) { if (a.lvl) { a.lvl = 0; this.resScale = 1; this.diag.resScale = 1; this.resize(); } return; }
@@ -206,9 +265,11 @@
       for (const x of g) if (x > a.vs * 1.5 + 2) slow++;
       const frac = slow / g.length;
       const LV = [1, 0.85, 0.72, 0.6];
-      if (frac > 0.2 && a.lvl < LV.length - 1) { a.lvl++; a.good = 0; a.dropAt = now; }
-      else if (frac < 0.05 && a.lvl > 0 && now - a.dropAt > 8000) { if (++a.good >= 3) { a.lvl--; a.good = 0; } else return; }
-      else { if (frac >= 0.05) a.good = 0; return; }
+      // every change reallocates the canvases (a visible hitch), so change rarely: drop only after two bad windows in a
+      // row, and climb back only after 30 s of smooth frames
+      if (frac > 0.25 && a.lvl < LV.length - 1) { if (++a.bad < 2) return; a.lvl++; a.good = 0; a.bad = 0; a.dropAt = now; }
+      else if (frac < 0.05 && a.lvl > 0 && now - a.dropAt > 30000) { a.bad = 0; if (++a.good >= 5) { a.lvl--; a.good = 0; a.dropAt = now; } else return; }
+      else { if (frac >= 0.05) a.good = 0; if (frac <= 0.25) a.bad = 0; return; }
       this.resScale = LV[a.lvl];
       this.diag.resScale = this.resScale;
       this.resize();
@@ -444,6 +505,30 @@
         g.strokeStyle = '#7fe08f'; g.lineWidth = 2.5;
         for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(11, 11 + i * 9); g.lineTo(20, 7 + i * 9); g.lineTo(29, 11 + i * 9); g.stroke(); }
         g.strokeStyle = '#8d97a3'; g.lineWidth = 2; g.strokeRect(4, 4, 32, 32);
+      } else if (id === 'sandbag') {
+        g.fillStyle = '#2a241a'; rr(1, 3, 38, 35, 6); g.fill();
+        for (const [x, y, w] of [[3, 5, 17], [21, 5, 16], [2, 15, 12], [15, 15, 22], [3, 26, 18], [22, 26, 15]]) {
+          g.fillStyle = '#9a8660'; rr(x, y, w, 9.5, 4); g.fill();
+          g.fillStyle = 'rgba(255,255,255,0.13)'; g.fillRect(x + 2, y + 1.5, w - 4, 1.6);
+          g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(x + 2, y + 7, w - 4, 1.6);
+        }
+      } else if (id === 'mud') {
+        g.fillStyle = 'rgba(52,36,20,0.9)'; g.beginPath(); g.ellipse(20, 20, 19, 17, 0.2, 0, TAU); g.fill();
+        g.fillStyle = 'rgba(84,60,34,0.85)'; g.beginPath(); g.ellipse(18, 19, 14, 11, 0.4, 0, TAU); g.fill();
+        g.fillStyle = 'rgba(150,130,100,0.35)'; g.beginPath(); g.ellipse(14, 15, 5, 2, 0.3, 0, TAU); g.ellipse(25, 24, 4, 1.6, 0.2, 0, TAU); g.fill();
+        g.fillStyle = 'rgba(30,20,10,0.6)'; for (const [x, y] of [[26, 13], [11, 25], [22, 28]]) { g.beginPath(); g.arc(x, y, 1.6, 0, TAU); g.fill(); }
+      } else if (id === 'beartrap') {
+        g.fillStyle = '#2a2c30'; g.beginPath(); g.arc(20, 20, 13, 0, TAU); g.fill();
+        g.strokeStyle = '#8d97a3'; g.lineWidth = 2.4; g.beginPath(); g.arc(20, 20, 13, 0, TAU); g.stroke();
+        g.fillStyle = '#c3cbd4';
+        for (let i = 0; i < 10; i++) { const a = i * TAU / 10; g.beginPath(); g.moveTo(20 + Math.cos(a - 0.14) * 12, 20 + Math.sin(a - 0.14) * 12); g.lineTo(20 + Math.cos(a) * 6.5, 20 + Math.sin(a) * 6.5); g.lineTo(20 + Math.cos(a + 0.14) * 12, 20 + Math.sin(a + 0.14) * 12); g.fill(); }
+        g.fillStyle = '#7a1a12'; g.beginPath(); g.arc(20, 20, 3.4, 0, TAU); g.fill();
+      } else if (id === 'torch') {
+        g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(22, 25, 8, 5, 0, 0, TAU); g.fill();
+        g.fillStyle = '#4a3420'; g.fillRect(18, 14, 4, 16);
+        g.fillStyle = '#2a2018'; g.fillRect(16.5, 12, 7, 4);
+        g.fillStyle = '#ff8a2c'; g.beginPath(); g.ellipse(20, 10, 4.5, 6, 0, 0, TAU); g.fill();
+        g.fillStyle = '#ffe08a'; g.beginPath(); g.ellipse(20, 11, 2.2, 3.4, 0, 0, TAU); g.fill();
       } else if (id === 'wire') {
         g.strokeStyle = '#3a3a3a'; g.lineWidth = 3;
         g.beginPath(); g.moveTo(4, 4); g.lineTo(4, 36); g.moveTo(36, 4); g.lineTo(36, 36); g.stroke();
@@ -514,18 +599,39 @@
     // ---------------------------------------------------------- effects
     part(o) { if (this.parts.length < 900) this.parts.push(o); }
     blood(x, y, ang, n, color, speed) {
+      n = this.gore === 2 ? n : this.gore === 1 ? Math.ceil(n * 0.35) : 0;
       for (let i = 0; i < n; i++) {
-        const a = ang + rand(-0.7, 0.7), s = rand(0.3, 1) * (speed || 220);
-        this.part({ k: 'blood', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.15, 0.4), max: 0.4, size: rand(1.5, 3.6), c: color });
+        const a = ang + rand(-0.55, 0.55) * (Math.random() < 0.25 ? 2 : 1), s = rand(0.25, 1) * (speed || 220);
+        this.part({ k: 'blood', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.12, 0.38), max: 0.38, size: rand(0.8, 2.6), c: goreCol(color) });
       }
+    }
+    // Exit spray: blood leaves the far side of a hit along the bullet's path and lands as stretched drops and
+    // fine mist, densest and biggest close to the body, thinning with distance.
+    spray(x, y, ang, power, color) {
+      if (this.gore === 0 || this.splatBudget-- <= 0) return;
+      const d = this.dctx, k = this.gore === 1 ? 0.5 : 1, n = Math.round((4 + power * 5) * k);
+      for (let i = 0; i < n; i++) {
+        const f = Math.pow(Math.random(), 1.6), dist = 12 + f * (40 + power * 70), a = ang + rand(-0.32, 0.32) * (0.5 + f);
+        const px = x + Math.cos(a) * dist, py = y + Math.sin(a) * dist, big = (1 - f) * (1.6 + power * 1.6) + 0.5;
+        d.fillStyle = goreCol(color); d.globalAlpha = rand(0.55, 0.9);
+        drop(d, px, py, big * rand(2.2, 4.5), big * rand(0.5, 0.9), a);
+      }
+      for (let i = 0; i < 2; i++) {                                         // a couple of heavy drops that land close and splash
+        const dist = rand(10, 26 + power * 20), a = ang + rand(-0.3, 0.3);
+        d.fillStyle = goreCol(color); d.globalAlpha = 0.8; blot(d, x + Math.cos(a) * dist, y + Math.sin(a) * dist, rand(1.6, 3.4) * (0.7 + power), rand(1.3, 2), a);
+      }
+      d.globalAlpha = 0.5; d.fillStyle = goreCol(color);                      // mist
+      for (let i = 0; i < n * 2; i++) { const dist = rand(8, 60 + power * 80), a = ang + rand(-0.5, 0.5); d.fillRect(x + Math.cos(a) * dist, y + Math.sin(a) * dist, rand(0.6, 1.4), rand(0.6, 1.4)); }
+      d.globalAlpha = 1;
     }
     // Chunks that fly off and stay on the ground.
     gibs(x, y, n, look, acid) {
+      if (this.gore < 2) n = 0;
       for (let i = 0; i < n; i++) {
         const a = rand(0, TAU), sp = rand(80, 260);
         const kind = Math.random();
         this.part({ k: 'gib', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.35, 0.6), max: 0.6, size: rand(2.5, 5.5), rot: rand(0, TAU), spin: rand(-12, 12),
-          c: kind < 0.45 ? (acid ? '#5e7a1c' : '#7a1210') : kind < 0.8 ? shade(look.body, 0.7) : '#d8ccb4' });
+          c: kind < 0.45 ? (acid ? pickOf(BILE) : pickOf(BLOOD)) : kind < 0.9 ? shade(look.body, 0.45) : '#a89c84' });
       }
     }
     // The track a Burrower leaves: a dug furrow with crumbled, lighter edges and the odd crack, painted onto the ground.
@@ -552,16 +658,38 @@
       g.restore();
       z._fx = z.x; z._fy = z.y;
     }
-    splat(x, y, r, color, alpha) {
+    // A stain on the ground: overlapping irregular blots in several dark shades with a near-black core, satellite
+    // drops thrown outward (stretched along `ang` when the impact had a direction), hair-thin streaks and a wet glint.
+    splat(x, y, r, color, alpha, ang) {
+      if (this.gore === 0) return;
+      if (this.gore === 1) { alpha *= 0.55; r *= 0.75; }
       if (this.splatBudget-- <= 0) return;      // plenty of gore, but never a frame-time spike
-      const d = this.dctx;
-      d.fillStyle = color;
-      for (let i = 0; i < 6; i++) {
-        d.globalAlpha = alpha * rand(0.4, 1);
-        const a = rand(0, TAU), dd = rand(0, r);
-        d.beginPath(); d.ellipse(x + Math.cos(a) * dd, y + Math.sin(a) * dd, rand(r * 0.2, r * 0.6), rand(r * 0.15, r * 0.45), rand(0, 3), 0, TAU); d.fill();
+      const d = this.dctx, dir = ang !== undefined;
+      for (let i = 0; i < 3; i++) {
+        d.fillStyle = goreCol(color); d.globalAlpha = alpha * rand(0.45, 0.8);
+        blot(d, x + rand(-r, r) * 0.25, y + rand(-r, r) * 0.25, r * rand(0.55, 0.9), dir ? rand(1.2, 1.8) : rand(0.8, 1.3), dir ? ang : rand(0, TAU));
+      }
+      d.fillStyle = color && goreCol(color) !== color ? (BILE.indexOf(goreCol(color)) >= 0 ? '#141a08' : '#1a0202') : '#1a0202';
+      d.globalAlpha = alpha * 0.6; blot(d, x, y, r * 0.42, 1, rand(0, TAU));          // the thick, dark middle
+      const sat = Math.round(3 + r * 0.25);
+      for (let i = 0; i < sat; i++) {
+        const a = dir ? ang + rand(-0.7, 0.7) : rand(0, TAU), dist = r * rand(0.9, dir ? 3.2 : 2.2), sz = rand(0.5, 1.2) + r * 0.03;
+        const px = x + Math.cos(a) * dist, py = y + Math.sin(a) * dist;
+        d.fillStyle = goreCol(color); d.globalAlpha = alpha * rand(0.5, 0.95);
+        drop(d, px, py, sz * rand(1.6, 3.6), sz * 0.7, a);
+        if (Math.random() < 0.35) { d.strokeStyle = d.fillStyle; d.lineWidth = rand(0.5, 1); d.globalAlpha = alpha * 0.4; d.beginPath(); d.moveTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5); d.lineTo(px, py); d.stroke(); }
+      }
+      if (r > 5) {                                                                // wet: a small pale glint, lost as it dries
+        d.globalAlpha = 0.1 * alpha; d.fillStyle = '#ffb4a8';
+        d.beginPath(); d.ellipse(x - r * 0.15, y - r * 0.2, r * 0.22, r * 0.07, -0.5, 0, TAU); d.fill();
       }
       d.globalAlpha = 1;
+    }
+    // A pool that creeps outward from a body for a few seconds.
+    pool(x, y, r, color) {
+      if (this.gore < 2) return;
+      (this.bpools || (this.bpools = [])).push({ x, y, r: r * 0.35, max: r, c: goreCol(color), dark: BILE.indexOf(goreCol(color)) >= 0 ? '#12170a' : '#170203', seed: Array.from({ length: 9 }, () => 0.7 + Math.random() * 0.5), t: 0 });
+      if (this.bpools.length > 30) this.bpools.shift();
     }
     floatText(x, y, text, color, big) {
       this.texts.push({ x, y, text, color: color || '#fff', life: big ? 2 : 1.1, max: big ? 2 : 1.1, big: !!big });
@@ -586,11 +714,10 @@
         }
         case 'hit': {
           const acid = ACIDY[e.ztype];
-          this.blood(e.x, e.y, e.ang, 7, acid ? '#8fae2a' : '#9a1612', 260);
-          if (Math.random() < 0.55) {       // spray lands on the ground behind the target
-            const d = rand(10, 34);
-            this.splat(e.x + Math.cos(e.ang) * d, e.y + Math.sin(e.ang) * d, rand(5, 10), acid ? '#4e6a18' : '#5e0c0a', 0.5);
-          }
+          const gc = acid ? '#4e6a18' : '#5e0c0a';
+          this.blood(e.x, e.y, e.ang, 6, gc, 300);
+          if (Math.random() < 0.7) this.spray(e.x, e.y, e.ang, rand(0.2, 0.7), gc);         // out of the exit side, along the bullet
+          if (Math.random() < 0.2) this.splat(e.x + Math.cos(e.ang) * rand(6, 16), e.y + Math.sin(e.ang) * rand(6, 16), rand(3, 6), gc, 0.55, e.ang);
           break;
         }
         case 'die': {
@@ -599,15 +726,42 @@
           const big = e.r > 20;
           this.splat(e.x, e.y, e.r * (big ? 2.4 : 1.9), acid ? '#4e6a18' : '#4e0a08', 0.7);
           this.splat(e.x + rand(-8, 8), e.y + rand(-8, 8), e.r * 1.1, acid ? '#6a8a20' : '#6e100c', 0.6);
-          const d = this.dctx;
-          d.save(); d.translate(e.x, e.y); d.rotate(rand(0, TAU)); d.globalAlpha = 0.65;
-          d.fillStyle = e.burn ? '#17130f' : shade(look.body, 0.55);
-          d.beginPath(); d.ellipse(0, 0, e.r * 0.8, e.r * 1.05, 0, 0, TAU); d.fill();
-          d.fillStyle = e.burn ? '#201a14' : shade(look.head, 0.55);
-          d.beginPath(); d.arc(e.r * 0.5, e.r * 0.4, e.r * 0.5, 0, TAU); d.fill();
+          const d = this.dctx, R0 = e.r, torn = e.gib && this.gore === 2;
+          const bodyC = e.burn ? '#17130f' : shade(look.body, 0.55), headC = e.burn ? '#201a14' : shade(look.head, 0.55), armC = e.burn ? '#14100c' : shade(look.arm, 0.5);
+          d.save(); d.translate(e.x, e.y); d.rotate((e.ang || 0) + rand(-0.5, 0.5)); d.lineCap = 'round';
+          if (this.gore === 0) {                       // gore off: a faint dust mark only
+            d.globalAlpha = 0.25; d.fillStyle = '#3a3428'; d.beginPath(); d.ellipse(0, 0, R0, R0 * 0.8, 0, 0, TAU); d.fill();
+          } else if (torn) {                           // overkill: blown apart, pieces flung around a wide pool
+            for (let i = 0; i < 3; i++) { d.globalAlpha = 0.4; d.fillStyle = pickOf(acid ? BILE : BLOOD); blot(d, rand(-4, 4), rand(-4, 4), R0 * rand(1.2, 1.7), rand(1, 1.4), rand(0, TAU)); }
+            for (let i = 0; i < 5; i++) {
+              const a = rand(0, TAU), dd = rand(R0 * 0.8, R0 * 2.6), px = Math.cos(a) * dd, py = Math.sin(a) * dd;
+              d.globalAlpha = 0.5; d.strokeStyle = pickOf(acid ? BILE : BLOOD); d.lineWidth = rand(1.2, 3);      // drag streak
+              d.beginPath(); d.moveTo(px * 0.3, py * 0.3); d.lineTo(px, py); d.stroke();
+              d.globalAlpha = 0.75;
+              if (i === 0) { d.fillStyle = headC; d.beginPath(); d.arc(px, py, R0 * 0.42, 0, TAU); d.fill(); }
+              else if (i < 3) { d.strokeStyle = armC; d.lineWidth = R0 * 0.32; const b = rand(0, TAU); d.beginPath(); d.moveTo(px, py); d.lineTo(px + Math.cos(b) * R0 * 0.8, py + Math.sin(b) * R0 * 0.8); d.stroke(); }
+              else { d.fillStyle = bodyC; d.beginPath(); d.ellipse(px, py, R0 * 0.45, R0 * 0.3, a, 0, TAU); d.fill();
+                d.strokeStyle = '#d8ccb4'; d.lineWidth = 1.4; d.beginPath(); d.moveTo(px - 3, py); d.lineTo(px + 4, py + 2); d.stroke(); }      // a bone end
+            }
+          } else {                                     // a body sprawled where it fell, arms flung out, in a pool
+            for (let i = 0; i < 2; i++) { d.globalAlpha = 0.4; d.fillStyle = pickOf(acid ? BILE : BLOOD); blot(d, -R0 * 0.2 + rand(-3, 3), rand(-3, 3), R0 * rand(1, 1.3), rand(1, 1.4), rand(0, TAU)); }
+            d.globalAlpha = 0.7; d.strokeStyle = armC; d.lineWidth = R0 * 0.3;
+            d.beginPath(); d.moveTo(R0 * 0.1, -R0 * 0.6); d.lineTo(R0 * rand(0.6, 1.2), -R0 * rand(0.9, 1.5));
+            d.moveTo(R0 * 0.1, R0 * 0.6); d.lineTo(-R0 * rand(0.1, 0.7), R0 * rand(1.1, 1.5));
+            d.moveTo(-R0 * 0.6, -R0 * 0.3); d.lineTo(-R0 * 1.5, -R0 * rand(0.3, 0.7)); d.moveTo(-R0 * 0.6, R0 * 0.3); d.lineTo(-R0 * 1.45, R0 * rand(0.1, 0.6)); d.stroke();
+            d.fillStyle = bodyC; blot(d, 0, 0, R0 * 0.95, 1.3, 0);                                  // a slumped, uneven heap, not an oval
+            const hy = R0 * rand(-0.3, 0.3);
+            d.fillStyle = headC; blot(d, R0 * 0.85, hy, R0 * 0.45, 1.1, rand(0, TAU));
+            fleshSprites(); d.globalAlpha = 0.8; d.drawImage(ROT[(Math.random() * 4) | 0], -R0, -R0 * 0.75, R0 * 2, R0 * 1.5);
+            d.globalAlpha = 0.45; d.fillStyle = '#0c0606'; for (let i = 0; i < 3; i++) blot(d, rand(-R0, R0) * 0.6, rand(-R0, R0) * 0.4, R0 * rand(0.15, 0.3), rand(1, 2), rand(0, TAU));     // shadowed folds
+            d.globalAlpha = 0.7;
+            if (!e.burn && this.gore === 2) { d.fillStyle = '#5a0b09'; d.beginPath(); d.ellipse(R0 * rand(-0.3, 0.2), R0 * rand(-0.2, 0.2), R0 * 0.3, R0 * 0.18, rand(0, 3), 0, TAU); d.fill(); }
+          }
           d.restore(); d.globalAlpha = 1;
-          this.blood(e.x, e.y, rand(0, TAU), big ? 60 : 18, acid ? '#8fae2a' : '#9a1612', 300);
-          this.gibs(e.x, e.y, big ? 12 : e.burn ? 2 : 5, look, acid);
+          if (!e.burn) this.pool(e.x, e.y, e.r * (big ? 2.6 : 1.7), acid ? '#4e6a18' : '#4e0a08');
+          this.blood(e.x, e.y, rand(0, TAU), (big ? 60 : 18) * (e.gib ? 2.2 : 1), acid ? '#8fae2a' : '#9a1612', e.gib ? 420 : 300);
+          this.gibs(e.x, e.y, (big ? 12 : e.burn ? 2 : 5) * (e.gib ? 3 : 1), look, acid);
+          if (e.gib && !big) this.shake = Math.max(this.shake, 3);
           if (big) { this.shake = Math.max(this.shake, 14); this.rings.push({ x: e.x, y: e.y, r: e.r * 5, life: 0.6, max: 0.6, c: '255,80,80' }); }
           break;
         }
@@ -662,6 +816,13 @@
         case 'shove':
           for (let i = 0; i < 6; i++) { const a = rand(0, TAU), sp = rand(60, 140); this.part({ k: 'debris', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.3, max: 0.3, size: rand(2, 3.5), c: '#8a7c6a' }); }
           break;
+        case 'squeeze': {
+          for (let i = 0; i < 7; i++) { const a = rand(0, TAU), sp = rand(50, 170); this.part({ k: i < 5 ? 'debris' : 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.3, max: 0.3, size: rand(1.5, 3.2), c: i < 5 ? '#a57644' : '#ffd890' }); }
+          const g = this.dctx; g.save(); g.globalAlpha = 0.5; g.strokeStyle = '#d8c8a8'; g.lineWidth = 1.1; g.translate(e.x, e.y); g.rotate(rand(0, TAU));
+          for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(-7, i * 2.4); g.lineTo(7, i * 2.4 + rand(-1.5, 1.5)); g.stroke(); }
+          g.restore();
+          break;
+        }
         case 'ricochet':
           for (let i = 0; i < 5; i++) { const a = rand(0, TAU), sp = rand(100, 220); this.part({ k: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.15, max: 0.15, size: 1.5, c: '#ffe0a0' }); }
           break;
@@ -893,12 +1054,21 @@
         const f = Math.exp(-drag * dt);
         p.vx *= f; p.vy *= f;
         if (p.life <= 0) {
-          if (p.k === 'blood') { const d = this.dctx; d.globalAlpha = 0.6; d.fillStyle = shade(p.c.length === 7 ? p.c : '#8a1512', 0.6); d.beginPath(); d.ellipse(p.x, p.y, p.size * 1.6, p.size * 1.1, rand(0, 3), 0, TAU); d.fill(); d.globalAlpha = 1; }
+          if (p.k === 'blood') { const d = this.dctx; d.globalAlpha = rand(0.5, 0.85); d.fillStyle = p.c; drop(d, p.x, p.y, p.size * rand(1.6, 3.4), p.size * 0.75, Math.atan2(p.vy, p.vx)); d.globalAlpha = 1; }
           else if (p.k === 'gib') {
             const d = this.dctx;
-            d.globalAlpha = 0.55; d.fillStyle = '#4e0a08'; d.beginPath(); d.arc(p.x, p.y, p.size * 2.2, 0, TAU); d.fill();
-            d.globalAlpha = 0.95; d.fillStyle = p.c; d.save(); d.translate(p.x, p.y); d.rotate(p.rot);
-            d.beginPath(); d.ellipse(0, 0, p.size, p.size * 0.65, 0, 0, TAU); d.fill(); d.restore(); d.globalAlpha = 1;
+            // a chunk skids to a stop: a dark smear dragged along its path, and the lump itself at the far end
+            const ga = Math.atan2(p.vy, p.vx), ca = Math.cos(ga), sa = Math.sin(ga), L = p.size * rand(2.5, 4.5);
+            d.globalAlpha = 0.7; d.fillStyle = pickOf(BLOOD); drop(d, p.x - ca * L * 0.3, p.y - sa * L * 0.3, L, p.size * 0.8, ga);
+            d.globalAlpha = 0.5; d.fillStyle = '#1c0303'; blot(d, p.x, p.y, p.size * 1.1, 1.3, ga);
+            if (p.c === '#a89c84') {                                               // a splinter of bone, half sunk in the mess
+              d.globalAlpha = 0.7; d.strokeStyle = '#8a7e68'; d.lineWidth = 1.2; d.lineCap = 'butt';
+              d.beginPath(); d.moveTo(p.x - Math.cos(p.rot) * p.size * 0.8, p.y - Math.sin(p.rot) * p.size * 0.8); d.lineTo(p.x + Math.cos(p.rot) * p.size * 0.8, p.y + Math.sin(p.rot) * p.size * 0.8); d.stroke();
+            } else {
+              d.globalAlpha = 0.9; d.fillStyle = Math.random() < 0.5 ? '#3d0c0a' : '#4a1512'; blot(d, p.x, p.y, p.size * 0.7, rand(1, 1.5), p.rot);      // raw, dark meat
+              d.globalAlpha = 0.25; d.fillStyle = '#c08a80'; d.fillRect(p.x - 0.8, p.y - 0.8, 1.2, 1.2);                                            // one wet glint
+            }
+            d.globalAlpha = 1;
           }
           else if (p.k === 'shell') { const d = this.dctx; d.save(); d.translate(p.x, p.y); d.rotate(p.rot); d.fillStyle = '#b89a3c'; d.globalAlpha = 0.8; d.fillRect(-2, -1, 4, 2); d.restore(); d.globalAlpha = 1; }
           continue;
@@ -908,6 +1078,40 @@
       ps.length = k;
       const age = (arr) => { let n = 0; for (let i = 0; i < arr.length; i++) { arr[i].life -= dt; if (arr[i].life > 0) arr[n++] = arr[i]; } arr.length = n; };
       age(this.arcs); age(this.rings); age(this.flashes); age(this.pools); if (this.marks) age(this.marks);
+      if (this.bpools && this.bpools.length) {
+        const d = this.dctx;
+        for (const b of this.bpools) {
+          b.t += dt; if (b.t < 0.14) continue; b.t = 0;
+          b.r += (b.max - b.r) * 0.16;
+          if (Math.random() < 0.5) {                 // the edge creeps unevenly: runnels and small lobes break the outline
+            const a = rand(0, TAU), rr = b.r * b.seed[Math.floor(a / TAU * 9) % 9];
+            d.globalAlpha = 0.5; d.fillStyle = b.c; blot(d, b.x + Math.cos(a) * rr * 0.95, b.y + Math.sin(a) * rr * 0.8, rand(1.5, 4.5), rand(1.3, 2.4), a);
+          }
+          // thin and reddish at the creeping edge, thick and near-black in the middle
+          for (const [k, al, colr] of [[1, 0.16, b.c], [0.8, 0.13, b.dark], [0.5, 0.16, b.dark]]) {
+            d.globalAlpha = al; d.fillStyle = colr; d.beginPath();
+            for (let i = 0; i <= 9; i++) { const a = i / 9 * TAU, rr = b.r * k * b.seed[i % 9], px = b.x + Math.cos(a) * rr, py = b.y + Math.sin(a) * rr * 0.85;
+              if (!i) d.moveTo(px, py); else { const a0 = (i - 0.5) / 9 * TAU, r0 = b.r * k * (b.seed[i % 9] + b.seed[(i - 1) % 9]) * 0.56; d.quadraticCurveTo(b.x + Math.cos(a0) * r0, b.y + Math.sin(a0) * r0 * 0.85, px, py); } }
+            d.fill();
+          }
+        }
+        d.globalAlpha = 1;
+        for (const b of this.bpools) {
+          if (b.max - b.r > 0.6) continue;             // settled: blood dries from the edge in, leaving a darker rim
+          d.globalAlpha = 0.4; d.strokeStyle = b.dark; d.lineWidth = 1.4; d.beginPath();
+          for (let i = 0; i <= 9; i++) { const a = i / 9 * TAU, rr = b.r * b.seed[i % 9], px = b.x + Math.cos(a) * rr, py = b.y + Math.sin(a) * rr * 0.85;
+            if (!i) d.moveTo(px, py); else { const a0 = (i - 0.5) / 9 * TAU, r0 = b.r * (b.seed[i % 9] + b.seed[(i - 1) % 9]) * 0.56; d.quadraticCurveTo(b.x + Math.cos(a0) * r0, b.y + Math.sin(a0) * r0 * 0.85, px, py); } }
+          d.stroke();
+          d.globalAlpha = 0.09; d.fillStyle = '#ffb4a8'; d.beginPath(); d.ellipse(b.x - b.r * 0.2, b.y - b.r * 0.25, b.r * 0.3, b.r * 0.08, -0.5, 0, TAU); d.fill();      // still wet in the middle
+        }
+        d.globalAlpha = 1;
+        this.bpools = this.bpools.filter((b) => b.max - b.r > 0.6);
+      }
+      this.dryT = (this.dryT || 0) + dt;
+      if (this.dryT > 1.5) {                       // drying: everything on the ground slowly turns darker and browner
+        this.dryT = 0;
+        const d = this.dctx; d.save(); d.globalCompositeOperation = 'source-atop'; d.globalAlpha = 0.03; d.fillStyle = '#1c0d08'; d.fillRect(0, 0, W, H); d.restore();
+      }
       if (this.novas) { for (const n of this.novas) n.t += dt; this.novas = this.novas.filter((n) => n.t * n.speed < PHOENIX_R + 200); }
       if (this.crate) {
         const was = this.crate.t; this.crate.t += dt;
@@ -1245,7 +1449,7 @@
       const L = ZLOOK[z.type] || ZLOOK.walker;
       if (z.burrowed) { this.drawBurrow(c, z); return; }
       const r = z.r, hit = z.hitT > 0, air = z.air || 0;
-      const col = (k) => (hit ? shade(L[k], 1.55) : z.burn > 0 ? shade(L[k], 0.55) : L[k]);
+      const col = (k) => (hit ? shade(L[k], 1.18) : z.burn > 0 ? shade(L[k], 0.55) : L[k]);
       c.save(); c.translate(z.x, z.y);
       // shadow stays on the ground; the body lifts when airborne
       c.fillStyle = 'rgba(0,0,0,' + (0.32 - air * 0.15) + ')';
@@ -1285,7 +1489,10 @@
         c.fillStyle = 'rgba(255,40,40,' + (0.25 + 0.15 * Math.sin(this.time * 14)) + ')';
         c.beginPath(); c.arc(0, 0, r * 1.45, 0, TAU); c.fill();
       }
-      c.rotate(z.ang);
+      const zd0 = GD.ZOMBIES[z.type] || {}, shamble = !zd0.seg && !zd0.wyrmHead && !zd0.fly;
+      c.rotate(z.ang + (shamble ? Math.sin((z.wob || 0) * 0.5 + z.id) * 0.14 : 0));
+      if (shamble) c.translate(0, Math.sin((z.wob || 0) + z.id * 2) * r * 0.07);
+      if (z.sqz) { c.translate(rand(-1.2, 1.2), rand(-1.2, 1.2)); c.scale(1.12, 0.78); }      // wedged in a gap, thrashing
       if (z.charge) {              // charging: speed streaks
         c.strokeStyle = 'rgba(255,140,80,0.6)'; c.lineWidth = 3;
         for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(-r * 1.1, i * r * 0.5); c.lineTo(-r * 2.6, i * r * 0.5); c.stroke(); }
@@ -1454,6 +1661,10 @@
         return;
       }
       // humanoid shapes
+      { const lame = z.id % 3 === 0 ? 0.35 : 1, st = Math.sin(z.wob || 0);          // feet: one leg drags on some
+        c.fillStyle = '#14110e';
+        c.beginPath(); c.ellipse(-r * 0.15 + st * r * 0.42, -r * 0.42, r * 0.34, r * 0.2, 0, 0, TAU);
+        c.ellipse(-r * 0.15 - st * r * 0.42 * lame, r * 0.42, r * 0.34, r * 0.2, 0, 0, TAU); c.fill(); }
       const heavy = t === 'brute' || t === 'boss' || t === 'juggernaut' || t === 'ironhide' || t === 'colossus';
       c.strokeStyle = col('arm');
       c.lineWidth = r * (heavy ? 0.6 : t === 'screamer' ? 0.28 : 0.4);
@@ -1465,10 +1676,22 @@
         c.beginPath(); c.moveTo(-r * 0.2, -r * 0.5); c.lineTo(-r * 1.3, -r * 0.8 + w * 4); c.moveTo(-r * 0.2, r * 0.5); c.lineTo(-r * 1.3, r * 0.8 - w * 4); c.stroke();
         c.lineWidth = r * 0.34;
       }
-      c.beginPath();
-      c.moveTo(r * 0.1, -r * 0.8); c.lineTo(reach + lunge + w * r * 0.15, -r * 0.45);
-      c.moveTo(r * 0.1, r * 0.8); c.lineTo(reach + lunge - w * r * 0.15, r * 0.45);
-      c.stroke();
+      { // arms: a dark outline, grey dead flesh, then forearms caked dark toward the hands
+        const lw = c.lineWidth, ax = reach + lunge, ay = w * r * 0.15;
+        const arms = (from) => { c.beginPath(); c.moveTo(r * 0.1 + (ax - r * 0.1) * from, -r * 0.8 + (r * 0.35 + ay) * from); c.lineTo(ax + ay, -r * 0.45);
+          c.moveTo(r * 0.1 + (ax - r * 0.1) * from, r * 0.8 - (r * 0.35 + ay) * from); c.lineTo(ax - ay, r * 0.45); c.stroke(); };
+        c.strokeStyle = 'rgba(8,6,4,0.6)'; c.lineWidth = lw + 1.6; arms(0);
+        c.strokeStyle = hit ? shade(L.arm, 0.95) : shade(L.arm, 0.78); c.lineWidth = lw; arms(0);
+        c.strokeStyle = 'rgba(46,8,6,0.7)'; c.lineWidth = lw * 0.85; arms(0.55);
+        c.strokeStyle = 'rgba(0,0,0,0.28)'; c.lineWidth = lw * 0.4; c.beginPath(); c.moveTo(r * 0.1, -r * 0.8 - lw * 0.25); c.lineTo(ax + ay, -r * 0.45 - lw * 0.25); c.moveTo(r * 0.1, r * 0.8 + lw * 0.25); c.lineTo(ax - ay, r * 0.45 + lw * 0.25); c.stroke();
+        c.lineWidth = lw; }
+      { const lw = c.lineWidth;                                                  // hands: thin clawed fingers, dark with old blood
+        c.strokeStyle = '#260504'; c.lineWidth = Math.max(1, lw * 0.26);
+        for (const sy of [-1, 1]) {
+          const hx = reach + lunge + sy * -w * r * 0.15, hy = sy * r * 0.45;
+          c.beginPath(); for (let f = -1; f <= 1; f++) { c.moveTo(hx - lw * 0.2, hy + f * lw * 0.22); c.lineTo(hx + lw * 0.75, hy + f * lw * 0.5 - sy * lw * 0.15); } c.stroke();
+        }
+        c.lineWidth = lw; }
       if (t === 'burrower' && !hit) {   // digging claws
         c.strokeStyle = '#e8dcc0'; c.lineWidth = 2;
         for (const sy of [-1, 1]) for (let k = -1; k <= 1; k++) {
@@ -1479,6 +1702,15 @@
       const bw = t === 'runner' || t === 'splitling' || t === 'leaper' ? 0.62 : t === 'bloater' || t === 'splitter' ? 0.98 : t === 'screamer' ? 0.58 : 0.78;
       c.fillStyle = col('body');
       c.beginPath(); c.ellipse(0, 0, r * bw * pulse, r * pulse, 0, 0, TAU); c.fill();
+      fleshSprites();
+      { const bx = r * bw * pulse, by = r * pulse, q = (k) => { const v = Math.sin(z.id * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
+        c.fillStyle = col('body');                                               // hunched shoulders break the oval
+        c.beginPath(); c.ellipse(bx * 0.15, -by * (0.72 + q(1) * 0.12), bx * 0.5, by * 0.34, 0.3, 0, TAU); c.ellipse(bx * 0.15, by * (0.72 + q(2) * 0.12), bx * 0.5, by * 0.34, -0.3, 0, TAU); c.fill();
+        c.fillStyle = shade(L.shirt, 0.7);                                       // rags hanging off its back
+        for (let i = 0; i < 5; i++) { const a = Math.PI + (q(i + 3) - 0.5) * 2.4, l = 1 + q(i + 9) * 0.35; c.beginPath(); c.moveTo(Math.cos(a - 0.18) * bx * 0.85, Math.sin(a - 0.18) * by * 0.85); c.lineTo(Math.cos(a) * bx * l * 1.1, Math.sin(a) * by * l * 1.1 + w * 1.2); c.lineTo(Math.cos(a + 0.18) * bx * 0.85, Math.sin(a + 0.18) * by * 0.85); c.fill(); }
+        c.strokeStyle = 'rgba(8,6,4,0.55)'; c.lineWidth = 1; c.beginPath(); c.ellipse(0, 0, bx, by, 0, 0, TAU); c.stroke();
+        c.save(); c.rotate((z.id % 7) * 0.9); c.drawImage(ROT[z.id % 4], -bx, -by, bx * 2, by * 2); c.restore();     // each one rots differently
+        c.drawImage(VOL, -bx, -by, bx * 2, by * 2); }
       if (!hit) {
         c.fillStyle = L.shirt; c.globalAlpha = 0.75 * za;
         c.beginPath(); c.ellipse(-r * 0.22, 0, r * 0.42, r * 0.8, 0, 0, TAU); c.fill();
@@ -1536,6 +1768,13 @@
           c.beginPath(); c.moveTo(-r * 0.4, -r * 0.5); c.lineTo(-r * 0.1, -r * 0.1); c.lineTo(-r * 0.45, r * 0.2); c.lineTo(-r * 0.15, r * 0.6); c.stroke();
         }
       }
+      if (!hit && this.gore > 0 && r >= 9) {      // rot: open wounds, bared ribs, a torn hem
+        const q = (k) => { const v = Math.sin(z.id * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
+        c.fillStyle = '#5e0c0a';
+        for (let i = 0; i < 2; i++) { c.beginPath(); c.ellipse(r * (q(i) * 0.7 - 0.55), r * (q(i + 4) * 1.2 - 0.6), r * (0.12 + q(i + 8) * 0.1), r * 0.07, q(i + 2) * 3, 0, TAU); c.fill(); }
+        if (z.id % 3 === 1) { c.strokeStyle = 'rgba(226,214,190,0.75)'; c.lineWidth = 1; for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(-r * 0.45 + i * r * 0.16, -r * 0.5); c.lineTo(-r * 0.4 + i * r * 0.16, -r * 0.15); c.stroke(); } }
+        c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.moveTo(-r * 0.62, r * (q(9) - 0.5)); c.lineTo(-r * 0.3, r * (q(9) - 0.38)); c.lineTo(-r * 0.62, r * (q(9) - 0.2)); c.fill();
+      }
       // head
       c.fillStyle = col('head');
       if (t === 'screamer') {
@@ -1543,6 +1782,9 @@
         c.fillStyle = '#2a0a12'; c.beginPath(); c.ellipse(r * 0.75, 0, r * (0.12 + 0.18 * Math.max(0, z.lunge || 0)), r * 0.2, 0, 0, TAU); c.fill();
       } else {
         c.beginPath(); c.arc(r * 0.28, 0, r * (heavy ? 0.42 : 0.52), 0, TAU); c.fill();
+        { const hr = r * (heavy ? 0.42 : 0.52); c.drawImage(ROT[(z.id + 1) % 4], r * 0.28 - hr, -hr, hr * 2, hr * 2); c.drawImage(VOL, r * 0.28 - hr, -hr, hr * 2, hr * 2);
+          c.strokeStyle = 'rgba(8,6,4,0.6)'; c.lineWidth = 1; c.beginPath(); c.arc(r * 0.28, 0, hr, 0, TAU); c.stroke();
+          c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.arc(r * 0.28, 0, hr, 2.2, 4.08); c.fill(); }       // the back of the skull sits in shadow
         if (t === 'juggernaut' && !hit) {  // horns
           c.fillStyle = '#e0d4bc';
           c.beginPath(); c.moveTo(r * 0.4, -r * 0.3); c.lineTo(r * 0.95, -r * 0.6); c.lineTo(r * 0.5, -r * 0.1); c.fill();
@@ -1550,6 +1792,14 @@
         }
         if (t === 'ironhide' && !hit) { c.fillStyle = '#9aa6b4'; c.beginPath(); c.arc(r * 0.28, 0, r * 0.42, -1.9, 1.9); c.fill(); }
         if (!hit) { c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.arc(r * 0.5, 0, r * 0.2, -1.2, 1.2); c.fill(); }
+        if (!hit && r >= 9) {                      // hollow sockets with a dead glint, and a slack jaw
+          const hr = r * (heavy ? 0.42 : 0.52);
+          c.fillStyle = '#0c0606';
+          c.beginPath(); c.arc(r * 0.28 + hr * 0.45, -hr * 0.42, hr * 0.26, 0, TAU); c.arc(r * 0.28 + hr * 0.45, hr * 0.42, hr * 0.26, 0, TAU); c.fill();
+          c.fillStyle = z.rage > 0 ? '#ff3020' : L.eye;
+          c.beginPath(); c.arc(r * 0.28 + hr * 0.5, -hr * 0.42, hr * 0.1, 0, TAU); c.arc(r * 0.28 + hr * 0.5, hr * 0.42, hr * (z.id % 4 === 0 ? 0 : 0.1), 0, TAU); c.fill();
+          if (this.gore > 0) { c.fillStyle = '#3a0a08'; c.beginPath(); c.ellipse(r * 0.28 + hr * 0.92, 0, hr * 0.14, hr * (0.22 + 0.2 * Math.max(0, z.lunge || 0)), 0, 0, TAU); c.fill(); }
+        }
       }
       c.restore();
       if (z.lit && this.dark > 0.3) {    // exposed by a Flood Lamp
@@ -1615,6 +1865,7 @@
         }
       }
       for (const st of sim.structs) {
+        if (st.id === 'torch') L = Math.max(L, (1 - Math.hypot(x - st.x, y - st.y) / GD.STRUCTS.torch.glow) * 1.4);
         if (st.id === 'lamp') L = Math.max(L, (1 - Math.hypot(x - st.x, y - st.y) / GD.STRUCTS.lamp.light) * 1.6);
         else if (AIMS(st.id)) {
           const dx = x - st.x, dy = y - st.y, d = Math.hypot(dx, dy);
@@ -1645,6 +1896,7 @@
       }
       for (const s of sim.structs) {
         if (s.id === 'lamp') this.glow(l, s.x, s.y, GD.STRUCTS.lamp.light, 1);
+        else if (s.id === 'torch') this.glow(l, s.x, s.y, GD.STRUCTS.torch.glow * (1 + 0.06 * Math.sin(this.time * 11 + s.uid)), 0.95);
         else if (s.id === 'lure') this.glow(l, s.x, s.y, 60, 0.5);
         else if (AIMS(s.id)) this.cone(l, s.x, s.y, s.ang, 300, 0.4, 0.5);
         else if (s.id === 'tesla') this.glow(l, s.x, s.y, s.flash > 0 ? 200 : 70, 0.7);
@@ -1744,6 +1996,8 @@
       }
       for (const s of sim.structs) if (!GD.STRUCTS[s.id].block) this.drawStruct(c, s);
       for (const p of sim.players) if (!p.away && p.down) this.drawPlayer(c, p);
+      c.fillStyle = 'rgba(0,0,0,0.3)';                          // a shadow under every solid build, drawn first so none falls on a neighbour
+      for (const s of sim.structs) if (GD.STRUCTS[s.id].block) c.fillRect(s.cx * CELL + 5, s.cy * CELL + 6, CELL, CELL);
       for (const s of sim.structs) if (GD.STRUCTS[s.id].block) this.drawStruct(c, s);
       if (this.crate) this.drawCrate(c, this.crate);
 
@@ -1847,7 +2101,10 @@
       // particles
       for (const p of this.parts) {
         const t = clamp(p.life / p.max, 0, 1);
-        if (p.k === 'blood' || p.k === 'debris') {
+        if (p.k === 'blood') {
+          c.globalAlpha = 0.9; c.strokeStyle = p.c; c.lineWidth = p.size; c.lineCap = 'round';
+          c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035); c.stroke();
+        } else if (p.k === 'debris') {
           c.globalAlpha = 0.9; c.fillStyle = p.c; c.beginPath(); c.arc(p.x, p.y, p.size, 0, TAU); c.fill();
         } else if (p.k === 'shell') {
           c.globalAlpha = 1; c.fillStyle = '#e0c060'; c.fillRect(p.x - 2, p.y - 1, 4, 2);
@@ -1949,6 +2206,7 @@
       }
       for (const s of sim.structs) {
         if (s.id === 'lamp') this.glow(c, s.x, s.y, 46, 0.7, '255,240,190');
+        else if (s.id === 'torch') this.glow(c, s.x, s.y - 4, 30 + 4 * Math.sin(this.time * 13 + s.uid), 0.8, '255,170,70');
         else if (AIMS(s.id) && s.flash > 0) { c.globalAlpha = 0.9; c.fillStyle = '#ffe0a0'; c.beginPath(); c.arc(s.x + Math.cos(s.ang) * 24, s.y + Math.sin(s.ang) * 24, rand(4, 8), 0, TAU); c.fill(); }
         else if (s.id === 'tesla') { c.globalAlpha = 0.5 + 0.3 * Math.sin(this.time * 9 + s.uid); c.fillStyle = '#9fe0ff'; c.beginPath(); c.arc(s.x, s.y, s.flash > 0 ? 9 : 4.5, 0, TAU); c.fill(); }
       }
@@ -1970,6 +2228,22 @@
       }
       c.globalCompositeOperation = 'source-over';
 
+      // weak points: walls touching only at a corner leave a diagonal gap zombies claw through (clearest by day)
+      { const solid = (x, y) => { const q = sim.structAt(x, y); return !!q && GD.STRUCTS[q.id].block && !GD.STRUCTS[q.id].husk; };
+        const a = (sim.phase === 'day' ? 0.9 : 0.4) * (0.65 + 0.35 * Math.sin(this.time * 5));
+        for (const s of sim.structs) {
+          if (!GD.STRUCTS[s.id].block || GD.STRUCTS[s.id].husk) continue;
+          for (const dy of [-1, 1]) {
+            if (!solid(s.cx + 1, s.cy + dy) || solid(s.cx + 1, s.cy) || solid(s.cx, s.cy + dy)) continue;
+            const gx = (s.cx + 1) * CELL, gy = (dy > 0 ? s.cy + 1 : s.cy) * CELL;
+            c.save(); c.translate(gx, gy); c.rotate(dy > 0 ? Math.PI / 4 : -Math.PI / 4);
+            c.fillStyle = `rgba(255,150,40,${a})`; c.fillRect(-9, -2, 18, 4);
+            c.fillStyle = `rgba(40,10,0,${a})`; for (const o of [-5, 0, 5]) c.fillRect(o - 0.8, -2, 1.6, 4);
+            c.restore();
+            if (sim.phase === 'day') { c.font = 'bold 10px "Segoe UI", sans-serif'; c.textAlign = 'center'; c.fillStyle = '#000'; c.fillText('GAP', gx + 1, gy - 9); c.fillStyle = '#ffb060'; c.fillText('GAP', gx, gy - 10); }
+          }
+        }
+      }
       // turrets knocked out by a Disruptor's EMP: dark, with current crawling over them
       for (const s of sim.structs) {
         if (!s.emp) continue;

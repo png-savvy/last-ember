@@ -109,6 +109,11 @@ const server = http.createServer(async (req, res) => {
 });
 
 // ---------------------------------------------------------------- the game
+// A steady clock for everything that paces the game. The wall clock (Date.now) cannot be trusted for that: under WSL it
+// is stepped back by over a second every half minute to correct drift, and every step used to freeze the stream of
+// snapshots for that long. steady() starts at the wall time and then only ever moves forward at the true rate.
+const T0_WALL = Date.now(), T0_HR = process.hrtime.bigint();
+const steady = () => T0_WALL + Number(process.hrtime.bigint() - T0_HR) / 1e6;
 let sim = new Sim();
 let paused = false;
 let speed = 1;                         // fast mode: the game runs up to 10x as fast (anyone can switch it)
@@ -470,11 +475,12 @@ function routeEvents() {
     if (e.type === 'over') dropAutosave();
   }
   sim.events.length = 0;
-  if (autosave) { autosave = false; writeSave(autoId(), true); }
+  if (autosave) { autosave = false; stallWhy = 'autosave'; writeSave(autoId(), true); }
 }
 
 function meta() {
-  const m = { diff: sim.difficulty, dev: sim.dev, paused, speed, v: PROTO, build: BUILD, now: Date.now() };
+  const m = { diff: sim.difficulty, dev: sim.dev, paused, speed, v: PROTO, build: BUILD, now: Math.round(steady()) };
+  if (stalls.length) m.stalls = stalls.slice(-6);
   if (sim.phase === 'lobby') { m.saves = saveList; m.leader = leader(); m.roster = lobbyRoster(); }
   if (sim.phase === 'over') {
     m.over = { nights: sim.stats.nights, kills: sim.stats.kills, reason: sim.stats.reason || 'dead',
@@ -488,11 +494,14 @@ function sendWorld() {
   if (!viewers.length) return;
   const snap = NV.encode(sim, evs, seq++);
   snap.meta = meta();
-  snap.ts = Date.now();                 // lets every screen buffer out Wi-Fi jitter
+  snap.ts = Math.round(steady());       // lets every screen buffer out Wi-Fi jitter
   const sig = NV.structSig(sim);
   const base = JSON.stringify(snap);
   let withS = null;
   for (const c of viewers) {
+    // a device on slow Wi-Fi: skip this snapshot rather than queue it. Queued snapshots arrive late in a burst, which
+    // looks like a freeze and then a jump; a skipped one is just replaced by the next (50 ms later).
+    if (c.ws.bufferedAmount > 96 * 1024) { c.dropped = (c.dropped || 0) + 1; continue; }
     if (c.sSig !== sig) {
       if (!withS) { snap.S = NV.encodeStructs(sim); withS = JSON.stringify(snap); }
       send(c, withS); c.sSig = sig;
@@ -508,7 +517,7 @@ function sendStates(now) {
     if (!p || p.away) continue;
     const st = sim.padState(p);
     st.p = pid; st.paused = paused; st.speed = speed; st.v = PROTO; st.code = BUILD; st.roster = roster;   // not 'build': that is the player's selected build tool
-    st.devMoney = sim.dev.money; st.devNight = sim.dev.startNight; st.devWyrm = !!sim.dev.wyrm; st.now = Date.now();
+    st.devMoney = sim.dev.money; st.devNight = sim.dev.startNight; st.devWyrm = !!sim.dev.wyrm; st.now = Math.round(steady());
     if (lobby) { st.saves = saveList; st.leader = lead; st.host = isHost(c); }
     const key = JSON.stringify(st, (k, v) => (k === 'now' ? undefined : v));
     const prev = c.stSent[pid];
@@ -634,22 +643,25 @@ function handOver() {
 
 const STEP = 1 / 60;
 let last = process.hrtime.bigint(), acc = 0, worldAt = 0, stAt = 0;
+const stalls = []; let stallWhy = '';       // times the server itself hung for over 120 ms, and what it was doing
 setInterval(() => {
   const t = process.hrtime.bigint();
   let dt = Number(t - last) / 1e9;
   last = t;
+  if (dt > 0.12) stalls.push([new Date().toISOString().slice(11, 19), Math.round(dt * 1000), sim.phase, sim.zombies.length, stallWhy]), stalls.length > 20 && stalls.shift();
+  stallWhy = '';
   if (dt > 0.25) dt = 0.25;
   if (sim.phase !== 'day' && sim.phase !== 'night') paused = false;
   if (!paused) {
     acc += dt * speed;
     let n = 0;
-    const most = 6 * speed, t0 = Date.now();
+    const most = 6 * speed, t0 = steady();
     // at high speeds a heavy night may need more steps than the computer can run: take what fits in 12 ms and drop
     // the rest (it simply runs as fast as it can) rather than stalling inputs and snapshots
-    while (acc >= STEP && n < most && (n < 6 || Date.now() - t0 < 12)) { safeUpdate(); routeEvents(); acc -= STEP; n++; }
+    while (acc >= STEP && n < most && (n < 6 || steady() - t0 < 12)) { safeUpdate(); routeEvents(); acc -= STEP; n++; }
     if (n === most || acc >= STEP) acc = 0;
   } else routeEvents();
-  const now = Date.now();
+  const now = steady();
   if (now - worldAt >= 50) { worldAt = now; sendWorld(); }
   if (now - stAt >= 100) { stAt = now; sendStates(now); }
 }, 8);

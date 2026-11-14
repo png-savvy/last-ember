@@ -35,6 +35,10 @@
 .shop .tile.on { border-color: #7fe08f; background: #18251c; }
 .shop .tile.tool { border-style: dashed; }
 .shop .tile.cant { opacity: 0.55; }
+.shop .card.locked { opacity: 0.5; filter: grayscale(0.85); border-style: dashed; }
+.shop .card.locked:hover { opacity: 0.85; }
+.shop .badge.lock { background: #3a4352; color: #cfd6dd; }
+.shop .lockhead { color: #96a0ac; margin-top: 14px; }
 .shop button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .shop button:active:not(:disabled) { transform: scale(0.97); }
 .shop .new, .shop .lots { font-size: 10.5px; font-weight: 800; padding: 2px 6px; border-radius: 5px; }

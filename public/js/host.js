@@ -120,6 +120,9 @@
     R.parts.length = 0; R.banner = null;
   }
   function onWorld(m) {
+    // gaps in the snapshot stream (server or network hiccups look like a freeze even when drawing is smooth)
+    { const t = performance.now(), gap = t - lastWorld; if (lastWorld && gap > 250 && !document.hidden) { (R.netLog || (R.netLog = [])).push([Math.round(t / 1000), Math.round(gap)]); if (R.netLog.length > 12) R.netLog.shift(); } }
+    if (m.meta && m.meta.stalls) R.srvStalls = m.meta.stalls;
     lastWorld = performance.now();
     if (m.meta) {
       syncClock(m.meta.now);
@@ -127,7 +130,9 @@
       // Local players (keyboard, gamepads) are signed back in automatically after the reload.
       if (m.meta.build) {
         if (!pageBuild) pageBuild = m.meta.build;
-        else if (m.meta.build !== pageBuild) {
+        else if (m.meta.build !== pageBuild && m.ph === 'night' && !(m.meta && m.meta.paused)) {
+          if (!R.updWait) { R.updWait = true; toast('Update ready: it loads at dawn, so the fight is not interrupted', 3500); }
+        } else if (m.meta.build !== pageBuild) {
           pageBuild = m.meta.build;
           location.reload();
           return;
@@ -242,6 +247,7 @@
     AudioFX.init();
     setMouse(e);
     if (!kbOn()) return;
+    if (shopOpen) { closeShop(); return; }          // the shop no longer covers the map: a click on the map closes it
     const st = states[KB];
     if (e.button === 2) {
       if (st && st.build) act(KB, 'build', '');
@@ -394,9 +400,11 @@
   function refreshAudioBtns() {
     $('aMusic').textContent = 'Music: ' + (AudioFX.isMusicOn() ? 'ON' : 'OFF');
     $('aMute').textContent = 'Sound: ' + (AudioFX.isMuted() ? 'OFF' : 'ON');
+    $('aGore').textContent = 'Gore: ' + ['Off', 'Reduced', 'Full'][R.gore];
     $('aSharp').textContent = 'Graphics: ' + (R.sharp ? 'Always sharp' : 'Auto (smooth)');
   }
   R.sharp = store.get('le_sharp') === '1';
+  $('aGore').onclick = () => { R.gore = (R.gore + 2) % 3; store.set('le_gore', String(R.gore)); refreshAudioBtns(); };
   $('aSharp').onclick = () => { R.sharp = !R.sharp; store.set('le_sharp', R.sharp ? '1' : '0'); refreshAudioBtns(); };
 
   // ---- sound style pickers (this device): click a gun style to hear a volley, a music style to hear its night
@@ -479,6 +487,7 @@
     const ps = m.roster || mirror.players.map((p) => ({ id: p.id, name: p.name, color: p.color, ready: false, dev: 'phone' }));
     const sig = [m.diff, d.money, d.wyrm, d.startNight, devOpen, kbOn(), delAsk, m.leader, JSON.stringify(m.saves || []), JSON.stringify(ps)].join('|');
     if (sig === lobbySig) return;
+    if (document.activeElement && document.activeElement.classList.contains('pnedit')) return;      // do not rebuild the list under someone typing a name
     lobbySig = sig;
     const ids = new Set(ps.map((p) => p.id));
     const fresh = seenIds ? ps.filter((p) => !seenIds.has(p.id)) : [];
@@ -493,8 +502,22 @@
       av.style.background = p.color; av.style.color = p.color;            // colour feeds the glow
       const ini = el('span', '', (p.name[0] || '?').toUpperCase()); ini.style.color = 'rgba(0,0,0,0.62)'; av.appendChild(ini);
       const who = el('div', 'who');
-      who.appendChild(el('span', 'pn', p.name));
-      const local = p.id === KB ? 'this keyboard' : p.id.startsWith(sid + ':gp') ? 'gamepad here' : p.dev === 'keyboard' ? 'other screen' : p.dev;
+      const gpSlot = p.id.startsWith(sid + ':gp') ? p.id.slice(sid.length + 1) : null;
+      if (gpSlot) {                     // a gamepad player at this screen: the name is a text box, type to rename
+        const inp = el('input', 'pn pnedit'); inp.value = p.name; inp.maxLength = 14; inp.spellcheck = false; inp.autocomplete = 'off';
+        inp.title = 'Click and type to rename this gamepad player';
+        const commit = () => {
+          const nm = inp.value.trim().slice(0, 14) || 'Pad ' + (+gpSlot.slice(2) + 1);
+          store.set('le_gpname_' + gpSlot, nm);
+          if (nm !== p.name && locals.has(gpSlot)) setLocal(gpSlot, true, nm);
+          lobbySig = '';
+        };
+        inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') inp.blur(); else if (e.key === 'Escape') { inp.value = p.name; inp.blur(); } });   // typing must not start the game
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('focus', () => inp.select());
+        who.appendChild(inp);
+      } else who.appendChild(el('span', 'pn', p.name));
+      const local = p.id === KB ? 'this keyboard' : p.id.startsWith(sid + ':gp') ? 'gamepad here · click the name to rename' : p.dev === 'keyboard' ? 'other screen' : p.dev;
       const pd = el('span', 'pd');
       if (p.id === m.leader) pd.appendChild(el('span', 'tagh', '★ HOST · '));
       pd.appendChild(document.createTextNode(local));
@@ -640,7 +663,12 @@
     const nd = !st.unlockAll && tab < 3 && GD.nextDrop(st.night);
     if (nd) {
       const ids = nd.ids.filter((id) => (tab === 0 ? GD.WEAPONS[id] : tab === 1 ? GD.STRUCTS[id] : GD.PERKS[id]));
-      if (ids.length) rows.push({ label: '📦 Next drop after night ' + nd.after, dim: true, note: 'Coming in the supply drop after night ' + nd.after + ': ' + ids.map(GD.itemName).join(', ') });
+      if (ids.length) rows.push({ label: '──── UNLOCKS NIGHT ' + (nd.after + 1) + ' ────', dim: true });
+      for (const id of ids) {           // greyed out, but the note still shows what it does and costs
+        const w = GD.WEAPONS[id], sd = GD.STRUCTS[id], k = GD.PERKS[id];
+        rows.push({ label: '🔒 ' + GD.itemName(id), dim: true, cost: w ? w.cost : sd ? GD.structCost(id, st.perks.engineer || 0) : GD.perkCost(id, 0),
+          note: 'Unlocks night ' + (nd.after + 1) + '.\n' + (w ? w.desc + '\nDamage ' + w.dmg + ' · magazine ' + w.mag + ' · range ' + w.range : sd ? sd.desc + '\nHP ' + sd.hp + (GD.TURRET_INFO[id] ? '\n' + GD.TURRET_INFO[id] : '') : k.desc) });
+      }
     }
     return rows;
   }
@@ -682,7 +710,7 @@
       return [['D-pad', 'nudge the spot a cell'], ['A / RT', st.build === 'move' ? 'pick up' : st.build === 'sell' ? 'salvage' : 'place (hold to lay a line)'],
         ['B', 'stop building'], ['Y', 'build menu'], ['L3 / R3', 'undo'], ['R stick', 'spot follows aim']];
     }
-    const L = [['L stick', 'move'], ['R stick', 'aim (push hard to fire)'], ['RT', 'fire'], ['X', 'reload'], ['LB / RB', 'swap gun'],
+    const L = [['L stick', 'move'], ['R stick', 'aim (push hard to fire)'], ['RT', 'fire'], ['X', 'reload'], ['B', 'next weapon'], ['LB / RB', 'swap gun (D-pad \u2190 \u2192 too)'],
       ['Y', 'shop & build menu'], ['A', 'pick up the build in front'], ['L3 / R3', 'undo']];
     if (mirror.phase === 'day') L.push(['Start', st.ready ? 'not ready' : 'ready for night']);
     L.push(['Back', 'pause (then X: game speed)']);
@@ -721,9 +749,11 @@
       if (hit(8) && inGame()) gact('pause', !paused());            // Back / View button
       const on = locals.has(g.slot), st = states[g.pid], me = mirror.getPlayer(g.pid);
       if (paused()) { if (g.help) g.help.style.display = 'none'; if (hit(1) || hit(9)) gact('pause', false); else if (hit(3)) gact('save'); else if (hit(2)) gact('speed', 'next'); g.prev = gp.buttons.map((b, n) => down(n)); continue; }
+      // sound still blocked: any gamepad button retries (works where the browser treats it as a user action)
+      if (AudioFX.state() !== 'running' && gp.buttons.some((b, n) => hit(n))) AudioFX.init();
       if (!on) {
         if (g.help) g.help.style.display = 'none';
-        if (hit(0) || hit(9)) { AudioFX.init(); setLocal(g.slot, true, 'Pad ' + (gp.index + 1)); }
+        if (hit(0) || hit(9)) { AudioFX.init(); setLocal(g.slot, true, store.get('le_gpname_' + g.slot) || 'Pad ' + (gp.index + 1)); }
       } else if (st && me) {
         if (hit(3) && mirror.phase === 'lobby') gact('resume');
         if (mirror.phase === 'over') { if (hit(2)) startReplay(); if (hit(3)) setOverView(!overView); }
@@ -795,6 +825,9 @@
               } else { const c = mirror.buildCell(me); act(g.pid, 'grab', { x: c.cx * GD.CELL + 20, y: c.cy * GD.CELL + 20 }); }
             }
             if (hit(1) && st.build) act(g.pid, 'build', '');
+            else if (hit(1)) act(g.pid, 'swap', 1);                       // B (when not building): next weapon
+            if (!building && hit(14)) act(g.pid, 'swap', -1);             // D-pad left / right: previous / next weapon
+            if (!building && hit(15)) act(g.pid, 'swap', 1);
             if (hit(10) || hit(11)) act(g.pid, 'undo');
           }
         }
@@ -821,10 +854,14 @@
     requestAnimationFrame(frame);
     let dt = (now - last) / 1000;
     last = now;
+    const rawMs = Math.round(dt * 1000);
     if (dt > 0.25) dt = 0.25;
     if (dt < 0) dt = 0;
     pollGamepads(now);
     kbInput(now);
+    // log long frames (over 80 ms) so freezes can be traced: when, how long, and what was on screen
+    // [page second, stall ms, of which our own drawing code took ms (the rest is the browser), zombies, builds]
+    if (rawMs > 80 && !document.hidden) { (R.slowLog || (R.slowLog = [])).push([Math.round(now / 1000), rawMs, Math.round(R.lastJs || 0), mirror.zombies.length, mirror.structs.length]); if (R.slowLog.length > 12) R.slowLog.shift(); }
     mirror.step(dt, now / 1000);
     let view = mirror;
     if (rmirror) {
@@ -852,6 +889,7 @@
           : 'Click to place  ·  hold and drag to lay a line  ·  Right-click / Esc to stop building')
           : 'B shop & build  ·  T game speed  ·  Right-click any build to move it  ·  Z undo  ·  R reload  ·  Q/E swap  ·  Enter ready') : '',
     });
+    R.lastJs = performance.now() - now;         // how long our own code took this frame (rAF time to done)
   }
 
   window.addEventListener('resize', () => R.resize());
@@ -862,19 +900,24 @@
   }).catch(() => { $('url').textContent = location.host; });
 
   // the browser only allows sound after a click or key press
-  const firstGesture = () => { AudioFX.init(); window.removeEventListener('pointerdown', firstGesture); };
-  window.addEventListener('pointerdown', firstGesture);
+  // Browsers only let a page make sound after a click, tap or key press ON THAT PAGE, and forget it on every reload
+  // (live updates reload the page). A second PC used as a display or with a gamepad may never get one, so: keep
+  // trying on every kind of input, and show a prompt for as long as sound is blocked.
+  const wake = () => AudioFX.init();
+  for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'click']) window.addEventListener(ev, wake, true);
+  setInterval(() => {
+    const st = AudioFX.state(), off = st !== 'running' && !AudioFX.isMuted();
+    $('soundHint').classList.toggle('show', off);
+    if (off && navigator.userActivation && navigator.userActivation.isActive) AudioFX.init();     // e.g. a gamepad button, where the browser counts it
+  }, 500);
+  $('soundHint').onclick = wake;
   setInterval(() => {
     if (!open) return;
-    let px = null;
-    try {
-      const g = R.ctx, c = canvas, at = (x, y) => Array.from(g.getImageData(Math.floor(c.width * x), Math.floor(c.height * y), 1, 1).data);
-      px = { edge: at(0.08, 0.85), mid: at(0.5, 0.5), top: at(0.5, 0.2) };
-    } catch (e) { px = String(e); }
-    let groundA = null;
-    try { groundA = R.ground.getContext('2d').getImageData(960, 3, 1, 1).data[3]; } catch (e) { groundA = String(e); }
+    // no pixel read-back here: reading the game canvas back from the graphics card froze the picture for a moment
+    // every time (and can push the browser into slow software drawing)
+    const px = null, groundA = null;
     send({ t: 'diag', d: { ua: navigator.userAgent, dpr: window.devicePixelRatio, canvas: [canvas.width, canvas.height], css: [innerWidth, innerHeight],
-      phase: mirror.phase, night: mirror.night, dark: +R.dark.toFixed(2), hidden: document.hidden, px, groundA, diag: R.diag,
+      slow: R.slowLog || null, net: R.netLog || null, srv: R.srvStalls || null, audio: AudioFX.debug(), act: navigator.userActivation ? [navigator.userActivation.hasBeenActive, navigator.userActivation.isActive] : null, phase: mirror.phase, night: mirror.night, dark: +R.dark.toFixed(2), hidden: document.hidden, px, groundA, diag: R.diag,
       players: mirror.players.length, zombies: mirror.zombies.length } });
   }, 15000);
   connect();

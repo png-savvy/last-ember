@@ -23,7 +23,7 @@ Keyboard: WASD, mouse, B shop, R reload, Q/E swap, Z undo, hold and drag to buil
 N force night start, P pause (then S saves, Q quits), T game speed (1x / 2x / 3x / 5x / 10x, also the button by the pause button;
 gamepad: pause, then X; phone: gear menu), M mute, F fullscreen.
 Gamepads: press A to join. Left stick move, right stick aim, RT fire, Y menu, A place / grab, B cancel, X reload,
-LB/RB swap, L3/R3 undo, Start ready, Back pause (then Y saves). A controls card under each joined gamepad shows
+LB/RB swap (also B for the next weapon, or D-pad left/right, when not building), L3/R3 undo, Start ready, Back pause (then Y saves). A controls card under each joined gamepad shows
 what every button does right now. While building, the D-pad nudges the build spot one cell at a time (hold to
 repeat); flick the right stick to make the spot follow your aim again. Hold A or RT and move the spot (walk or D-pad)
 to lay a whole line.
@@ -39,6 +39,10 @@ to lay a whole line.
   have, plus a teaser of the next crate. Dev mode or the terminal's `unlock on` opens everything.
 
 - Daytime has no timer. Night starts when every player presses READY.
+- **Diagonal gaps:** walls that touch only at a corner are not sealed. Small zombies (up to Ironhide size) squeeze through
+  slowly, clawing both walls; bigger ones tear the weaker wall down. Gaps are marked with an orange GAP tag by day.
+- **Night-1 builds** also include Sandbags ($12), Mud Pit ($25), Bear Trap ($35) and Torch ($20). The shop shows the next
+  supply drop greyed out with stats and prices. Gore: Full / Reduced / Off in the Audio panel (phone: gear menu).
 - **Guard the campfire.** Zombies go for whatever is closest: a survivor, a Noise Lure or the campfire. If the
   horde smashes the fire out, the run is lost. It gets tougher every night and is fully restored at dawn; a bar
   under it shows its health once it is being hit.

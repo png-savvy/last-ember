@@ -39,6 +39,10 @@
     bunker: { name: 'Bunker Wall', desc: 'Reinforced concrete. Three times tougher than steel: one cell that holds a whole flank.', cost: 380, hp: 3000, block: true, wall: true },
     fence: { name: 'Shock Fence', desc: 'A live wire wall: every zombie that hits it takes a jolt, and small ones are stunned for a moment.', cost: 160, hp: 520, block: true, wall: true, zap: 26 },
     gate: { name: 'Gate', desc: 'Survivors walk through. The dead do not.', cost: 85, hp: 380, block: true, gate: true, wall: true },
+    sandbag: { name: 'Sandbags', desc: 'The cheapest wall. Weak, but perfect for plugging a diagonal gap.', cost: 12, hp: 110, block: true, wall: true },
+    mud: { name: 'Mud Pit', desc: 'Slows zombies to half speed. No damage, but it never wears out.', cost: 25, hp: 400, block: false },
+    beartrap: { name: 'Bear Trap', desc: 'Clamps the first zombie that steps on it: 60 damage and held for 4 s (big ones break free sooner). Single use.', cost: 35, hp: 1, block: false, dmg: 60, hold: 4 },
+    torch: { name: 'Torch', desc: 'A small light (150 radius) so you can see them coming. Zombies walk past it.', cost: 20, hp: 80, block: false, glow: 150 },
     wire: { name: 'Razor Wire', desc: 'Slows whatever crosses it to 60% speed and shreds it a little.', cost: 70, hp: 160, block: false },
     trail: { name: 'Blood Trail', desc: 'Zombies follow the smell: they take a route up to 3x longer to walk along it. Paint a road through your killzone.', cost: 15, hp: 200, block: false },
     ward: { name: 'Warding Totem', desc: 'A pole of skulls the dead will not go near: their routes bend around it (they keep about 100 px away), though nothing stops them.', cost: 400, hp: 500, block: true, wardR: 3.5 },
@@ -140,7 +144,7 @@
   };
   // every turret, cheapest first: used to group them together in the build menus
   const TURRET_IDS = ['turret'].concat(GT_IDS, ['cannon', 'tesla', 'napalm', 'gravity', 'leviathan', 'hellmouth', 'sunlance', 'phoenix']).sort((a, b) => STRUCTS[a].cost - STRUCTS[b].cost);
-  const STRUCT_ORDER = ['wood', 'steel', 'bunker', 'fence', 'gate', 'wire', 'trail', 'ward', 'spikes', 'mine', 'lamp', 'lure', 'medic'].concat(TURRET_IDS);
+  const STRUCT_ORDER = ['sandbag', 'wood', 'steel', 'bunker', 'fence', 'gate', 'mud', 'wire', 'beartrap', 'torch', 'trail', 'ward', 'spikes', 'mine', 'lamp', 'lure', 'medic'].concat(TURRET_IDS);
   const TOOLS = {
     move: { name: 'Move', desc: 'Pick up any build and put it somewhere else. Free.' },
     sell: { name: 'Salvage', desc: 'Remove a structure for a partial refund.' },
