@@ -1,0 +1,111 @@
+/* Last Ember - menus follow the graphics style. render.js sets <html data-look="...">; Classic has no overrides.
+   Each look only sets variables; one shared rule set below applies them to every menu on both pages. */
+html[data-look="charcoal"] {
+  --lk-veil: rgba(14,14,16,0.9); --lk-panel: #1d1d20; --lk-btn: #29292d; --lk-ink: #e9e5da; --lk-dim: #a5a199; --lk-line: #e9e5da;
+  --lk-border: 2px dashed rgba(233,229,218,0.55); --lk-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  --lk-accent: #e9e5da; --lk-accent-ink: #0c0c0e; --lk-money: #ffab3c; --lk-bad: #d0261c;
+  --lk-font: "Segoe Print", "Bradley Hand", "Chalkboard SE", "Comic Sans MS", cursive; --lk-title: "Segoe Print", "Bradley Hand", "Chalkboard SE", cursive;
+  --lk-shadow: 4px 5px 0 rgba(0,0,0,0.6); --lk-tt: none; --lk-ls: 0;
+}
+html[data-look="woodcut"] {
+  --lk-veil: rgba(8,7,5,0.92); --lk-panel: #0d0b09; --lk-btn: #0d0b09; --lk-ink: #e6d9bc; --lk-dim: #a89c80; --lk-line: #e6d9bc;
+  --lk-border: 3px double #e6d9bc; --lk-radius: 0;
+  --lk-accent: #c01a14; --lk-accent-ink: #f4ead0; --lk-money: #e6d9bc; --lk-bad: #c01a14;
+  --lk-font: Georgia, "Times New Roman", serif; --lk-title: Georgia, "Times New Roman", serif;
+  --lk-shadow: none; --lk-tt: uppercase; --lk-ls: 0.08em;
+}
+html[data-look="watercolour"] {
+  --lk-veil: rgba(233,226,208,0.9); --lk-panel: #f1ead8; --lk-btn: #e6dcc4; --lk-ink: #2c2622; --lk-dim: #6e655a; --lk-line: rgba(44,38,34,0.55);
+  --lk-border: 1.5px solid rgba(44,38,34,0.55); --lk-radius: 18px 9px 16px 11px / 10px 17px 9px 15px;
+  --lk-accent: #b3121a; --lk-accent-ink: #fbf5e6; --lk-money: #7a5a12; --lk-bad: #b3121a;
+  --lk-font: Georgia, Palatino, "Book Antiqua", serif; --lk-title: Georgia, Palatino, serif;
+  --lk-shadow: 0 6px 18px rgba(90,80,60,0.25); --lk-tt: none; --lk-ls: 0.01em;
+}
+html[data-look="glass"] {
+  --lk-veil: rgba(6,7,26,0.9); --lk-panel: #10143c; --lk-btn: #1c2a72; --lk-ink: #f4e8c2; --lk-dim: #b4b8e0; --lk-line: #07070a;
+  --lk-border: 3px solid #07070a; --lk-radius: 22px 22px 5px 5px / 26px 26px 5px 5px;
+  --lk-accent: #f2b230; --lk-accent-ink: #1a1206; --lk-money: #ffd860; --lk-bad: #d42024;
+  --lk-font: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; --lk-title: "Palatino Linotype", Palatino, Georgia, serif;
+  --lk-shadow: inset 0 0 0 2px rgba(242,178,48,0.35), 0 0 26px rgba(40,60,200,0.35); --lk-tt: none; --lk-ls: 0.03em;
+}
+html[data-look="stitch"] {
+  --lk-veil: rgba(230,220,194,0.94); --lk-panel: #efe6cf; --lk-btn: #e2d7b8; --lk-ink: #23306a; --lk-dim: #6a6450; --lk-line: #b3182a;
+  --lk-border: 3px dashed #b3182a; --lk-radius: 0;
+  --lk-accent: #b3182a; --lk-accent-ink: #fbf4e0; --lk-money: #2f5a34; --lk-bad: #b3182a;
+  --lk-font: "Courier New", Courier, monospace; --lk-title: "Courier New", Courier, monospace;
+  --lk-shadow: none; --lk-tt: uppercase; --lk-ls: 0.1em;
+}
+html[data-look="puppet"] {
+  --lk-veil: rgba(20,9,3,0.93); --lk-panel: #170b04; --lk-btn: #241105; --lk-ink: #f6cf86; --lk-dim: #b98a4c; --lk-line: #c98a34;
+  --lk-border: 2px solid rgba(233,165,72,0.6); --lk-radius: 3px 26px 3px 26px;
+  --lk-accent: #f2b860; --lk-accent-ink: #120804; --lk-money: #ffe2a0; --lk-bad: #d8501a;
+  --lk-font: Georgia, "Times New Roman", serif; --lk-title: Georgia, "Times New Roman", serif;
+  --lk-shadow: 0 0 34px rgba(233,165,72,0.22); --lk-tt: none; --lk-ls: 0.04em;
+}
+html[data-look="kid"] {
+  --lk-veil: rgba(250,247,238,0.95); --lk-panel: #fdfbf3; --lk-btn: #fff3b8; --lk-ink: #2a3a8a; --lk-dim: #5a5a66; --lk-line: #d02a1e;
+  --lk-border: 3px solid #2a3a8a; --lk-radius: 14px 22px 11px 19px / 19px 12px 22px 13px;
+  --lk-accent: #d02a1e; --lk-accent-ink: #fffbe8; --lk-money: #2c8a34; --lk-bad: #d02a1e;
+  --lk-font: "Comic Sans MS", "Chalkboard SE", "Segoe Print", cursive; --lk-title: "Comic Sans MS", "Chalkboard SE", "Segoe Print", cursive;
+  --lk-shadow: 3px 4px 0 rgba(42,58,138,0.25); --lk-tt: none; --lk-ls: 0.02em;
+}
+html[data-look]:not([data-look="classic"]) body { font-family: var(--lk-font) !important; }
+html[data-look]:not([data-look="classic"]) :is(#lobby, .cover, #kbshop, #audioPanel, #gfxPanel, #pause, #over) { background: var(--lk-veil) !important; color: var(--lk-ink) !important; }
+html[data-look]:not([data-look="classic"]) :is(.panel, .shop .card, .shop .relic, .shop .tile, .shop .armbox, #plist li, .gpmenu, .gphelp, #toast, #bar, #roster > *, .gfx-card) {
+  background: var(--lk-panel) !important; color: var(--lk-ink) !important; border: var(--lk-border) !important; border-radius: var(--lk-radius) !important; box-shadow: var(--lk-shadow) !important;
+}
+html[data-look]:not([data-look="classic"]) :is(.btn, .pbtn, .seg button, .sbtn, .shop-tabs button, .big, #gearBtn, #shopClose, .gfx-seg button, input) {
+  background: var(--lk-btn) !important; color: var(--lk-ink) !important; border: var(--lk-border) !important; border-radius: var(--lk-radius) !important; font-family: var(--lk-font) !important;
+  text-transform: var(--lk-tt); letter-spacing: var(--lk-ls); box-shadow: none !important;
+}
+html[data-look]:not([data-look="classic"]) :is(.btn.on, .btn.go, .seg button.on, .sbtn.primary, .sbtn.on, .shop-tabs button.on, .shop .tile.on, .big:not(.alt), .gfx-seg button.on, .gfx-card.on, #plist li.ready .stt) {
+  background: var(--lk-accent) !important; color: var(--lk-accent-ink) !important; border-color: var(--lk-accent) !important;
+}
+html[data-look]:not([data-look="classic"]) :is(h1, h2, h3, .shead, .sechead, .armtitle, #shopHead) { font-family: var(--lk-title) !important; color: var(--lk-ink) !important; text-shadow: none !important; text-transform: var(--lk-tt); letter-spacing: var(--lk-ls); }
+html[data-look]:not([data-look="classic"]) :is(.tag, .wsub, .cdesc, .hint, small, .lbl, #lobbyStatus, .pd, .rrar, p, label, td, th, .gpn, .gpf, .gpt) { color: var(--lk-dim) !important; }
+html[data-look]:not([data-look="classic"]) :is(.cost, #money, #kbMoney, .money, #shopMoney, .m, #pcount) { color: var(--lk-money) !important; }
+html[data-look]:not([data-look="classic"]) :is(.btn, .sbtn, .seg button, .pbtn) small { color: inherit !important; opacity: 0.75; }
+html[data-look]:not([data-look="classic"]) .shop .stats span { background: transparent !important; border: var(--lk-border); color: var(--lk-dim) !important; border-radius: 0; }
+html[data-look]:not([data-look="classic"]) .shop .pips i { background: transparent; border: 1px solid var(--lk-line); border-radius: 0; }
+html[data-look]:not([data-look="classic"]) .shop .pips i.on { background: var(--lk-accent); }
+html[data-look="charcoal"] h1 { transform: rotate(-1.2deg); }
+html[data-look="woodcut"] h1 { border-top: 4px double #e6d9bc; border-bottom: 4px double #e6d9bc; padding: 0.1em 0.5em; color: #e6d9bc !important; }
+html[data-look="woodcut"] h1::first-letter { color: #c01a14; }
+html[data-look="watercolour"] h1 { color: #b3121a !important; font-style: italic; font-weight: 400; }
+html[data-look="watercolour"] :is(.panel, .cover > *, .shop .card) { background-image: radial-gradient(ellipse at 20% 10%, rgba(120,150,140,0.16), transparent 60%), radial-gradient(ellipse at 85% 90%, rgba(179,18,26,0.07), transparent 55%) !important; }
+
+/* ---- the Graphics panel (shared by the big screen and phones; see js/gfxmenu.js) */
+.gfx { display: flex; flex-direction: column; gap: 14px; width: min(980px, 94vw); max-height: 88vh; overflow-y: auto; text-align: left; touch-action: pan-y; }
+.gfx h2 { margin: 0; font-size: clamp(18px, 3vh, 26px); }
+.gfx h3 { margin: 6px 0 0; font-size: 13px; letter-spacing: 0.08em; color: #a9b2bd; font-weight: 800; }
+.gfx-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 10px; }
+.gfx-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; text-align: left; cursor: pointer; color: #e8ecf1; background: #161a22; border: 2px solid #3a4352; border-radius: 12px; font: inherit; }
+.gfx-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: #000; border-bottom: 1px solid rgba(128,128,128,0.4); }
+.gfx-card b { display: block; padding: 8px 10px 0; font-size: 15px; }
+.gfx-card p { margin: 0; padding: 3px 10px 6px; font-size: 12.5px; line-height: 1.35; color: #96a0ac; flex: 1; }
+.gfx-card small { display: block; padding: 0 10px 9px; font-size: 11.5px; color: #7d8794; }
+.gfx-card.on { border-color: #ffb54a; background: #2a2416; }
+.gfx-card.on b::after { content: "  ✓"; }
+.gfx-row { display: grid; grid-template-columns: minmax(120px, 0.9fr) 2fr; gap: 6px 14px; align-items: center; }
+.gfx-row > div:first-child b { display: block; font-size: 14.5px; }
+.gfx-row > div:first-child span { display: block; font-size: 12px; color: #96a0ac; }
+.gfx-seg { display: flex; gap: 6px; }
+.gfx-seg button { flex: 1; padding: 9px 6px; font: inherit; font-size: 13.5px; font-weight: 800; color: #aeb6c0; background: #161a22; border: 2px solid #3a4352; border-radius: 10px; cursor: pointer; }
+.gfx-seg button.on { color: #ffb54a; border-color: #ffb54a; background: #2a2416; }
+@media (max-width: 560px) { .gfx-row { grid-template-columns: 1fr; } }
+html[data-look]:not([data-look="classic"]) .gfx-row span, html[data-look]:not([data-look="classic"]) .gfx h3 { color: var(--lk-dim) !important; }
+html[data-look]:not([data-look="classic"]) .gfx .gfx-card.on :is(b, p, small) { color: var(--lk-accent-ink) !important; opacity: 1; }
+html[data-look="glass"] h1 { color: #f2b230 !important; text-shadow: 0 0 22px rgba(242,178,48,0.6) !important; font-variant: small-caps; }
+html[data-look="glass"] :is(.btn, .pbtn, .seg button, .sbtn, .gfx-seg button):nth-child(3n+2):not(.on):not(.primary) { background: #5a1436 !important; }
+html[data-look="glass"] :is(.btn, .pbtn, .seg button, .sbtn, .gfx-seg button):nth-child(3n):not(.on):not(.primary) { background: #14503a !important; }
+html[data-look="stitch"] :is(#lobby, .cover, .panel, #kbshop, #audioPanel, #gfxPanel, #pause, #over) { background-image: repeating-linear-gradient(45deg, rgba(120,104,70,0.13) 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, rgba(120,104,70,0.13) 0 1px, transparent 1px 6px) !important; }
+html[data-look="stitch"] h1 { color: #b3182a !important; font-weight: 700; letter-spacing: 0.22em; border-bottom: 4px dotted #23306a; padding-bottom: 0.1em; }
+html[data-look="stitch"] :is(.btn, .pbtn, .seg button, .sbtn, .gfx-seg button, .big) { font-weight: 700 !important; }
+html[data-look]:not([data-look="classic"]) #gfxBody .gfx-card.on :is(b, p, small) { color: var(--lk-accent-ink) !important; opacity: 1 !important; }
+html[data-look="puppet"] h1 { color: #f6cf86 !important; font-style: italic; text-shadow: 0 0 30px rgba(246,190,100,0.7) !important; }
+html[data-look="kid"] :is(#lobby, .cover, .panel, #kbshop, #audioPanel, #gfxPanel, #pause, #over) { background-image: repeating-linear-gradient(0deg, transparent 0 27px, rgba(90,140,220,0.35) 27px 28px) !important; }
+html[data-look="kid"] h1 { color: #d02a1e !important; transform: rotate(-2deg); -webkit-text-stroke: 2px #2a3a8a; }
+html[data-look="kid"] :is(.btn, .pbtn, .seg button, .sbtn, .gfx-seg button):nth-child(2n):not(.on):not(.primary) { background: #c9ecc0 !important; transform: rotate(0.6deg); }
+html[data-look="kid"] :is(.btn, .pbtn, .seg button, .sbtn, .gfx-seg button):nth-child(3n):not(.on):not(.primary) { background: #c6dcff !important; transform: rotate(-0.7deg); }
+html[data-look]:not([data-look="classic"]) :is(li, ol, ul, .keys, .help, .pn) { color: var(--lk-dim) !important; }
+html[data-look]:not([data-look="classic"]) :is(li, .keys, .help) :is(b, kbd, strong) { color: var(--lk-ink) !important; }

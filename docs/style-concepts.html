@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Ember: ten looks</title>
+<style>
+  :root { --bg: #0e0f12; --card: #16181d; --line: #2a2e37; --ink: #e9e6df; --dim: #9aa0aa; --hot: #ffb54a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { max-width: 1400px; margin: 0 auto; padding: 28px 16px 8px; }
+  h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 0.02em; }
+  header p { margin: 0; color: var(--dim); max-width: 78ch; }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); gap: 16px; }
+  article { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+  canvas { width: 100%; height: auto; display: block; background: #000; }
+  .txt { padding: 12px 14px 14px; }
+  h2 { margin: 0 0 4px; font-size: 18px; }
+  h2 span { color: var(--hot); margin-right: 8px; font-variant-numeric: tabular-nums; }
+  .txt p { margin: 0 0 8px; color: #cfd3da; }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
+  dt { color: var(--dim); } dd { margin: 0; color: #d9dce2; }
+  footer { max-width: 1400px; margin: 0 auto; padding: 4px 16px 40px; color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Last Ember: ten looks</h1>
+  <p>The same moment drawn ten ways: a camp at night, the fire, a wall with one gap, a turret, one survivor with a flashlight, the dead closing in. These are quick code sketches to compare directions, not finished art. Each card says how it would actually be built and what it costs.</p>
+</header>
+<main id="grid"></main>
+<footer>Every picture on this page is drawn live in your browser from one shared scene description.</footer>
+<script>
+(function () {
+  'use strict';
+  const W = 640, H = 360, T = 32, TAU = Math.PI * 2;
+  // ---- the shared scene
+  const FIRE = { x: 310, y: 184 };
+  const WALLS = [];
+  for (let x = 192; x <= 416; x += T) WALLS.push([x, 96]);
+  for (let y = 128; y <= 224; y += T) WALLS.push([192, y]);
+  WALLS.push([416, 128], [416, 160]);
+  const TURRET = { x: 368, y: 144, a: -0.5 };
+  const ME = { x: 352, y: 214, a: 0.42 };
+  const ZS = [[520, 262, 3.35, 11], [566, 150, 3.0, 11], [92, 196, 0.1, 11], [132, 300, -0.45, 11], [300, 332, -1.5, 10], [596, 318, 3.6, 11], [70, 84, 0.55, 17]];
+  const BLOOD = [[486, 250, 16], [150, 284, 12], [470, 226, 7]];
+  const SHOT = { x: 452, y: 258 };            // where the tracer ends
+  function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  // body parts as paths, in the creature's own frame (facing +x)
+  function torso(g, r) { g.beginPath(); g.ellipse(0, 0, r * 0.72, r, 0, 0, TAU); }
+  function head(g, r) { g.beginPath(); g.arc(r * 0.5, 0, r * 0.52, 0, TAU); }
+  function arms(g, r, reach) { g.beginPath(); g.moveTo(0, -r * 0.8); g.lineTo(r * reach, -r * 0.5); g.moveTo(0, r * 0.8); g.lineTo(r * (reach - 0.25), r * 0.38); }
+  function at(g, x, y, a, fn) { g.save(); g.translate(x, y); g.rotate(a); fn(); g.restore(); }
+  function eyes(g, r, col, s) { g.fillStyle = col; g.beginPath(); g.arc(r * 0.72, -r * 0.2, s, 0, TAU); g.arc(r * 0.72, r * 0.2, s, 0, TAU); g.fill(); }
+  function cone(g, x, y, a, len, half) { g.beginPath(); g.moveTo(x, y); g.arc(x, y, len, a - half, a + half); g.closePath(); }
+  function grain(g, n, alpha, seed) { const r = rng(seed); for (let i = 0; i < n; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '0,0,0' : '255,255,255'},${alpha * r()})`; g.fillRect(r() * W, r() * H, 1.4, 1.4); } }
+  function vignette(g, a) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, W * 0.62); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,0,0,${a})`); g.fillStyle = v; g.fillRect(0, 0, W, H); }
+  // darkness with holes punched by the fire and the flashlight
+  function dark(g, col, fireR, soft) {
+    const c = mk(W, H), l = c.getContext('2d');
+    l.fillStyle = col; l.fillRect(0, 0, W, H);
+    l.globalCompositeOperation = 'destination-out';
+    let gr = l.createRadialGradient(FIRE.x, FIRE.y, 0, FIRE.x, FIRE.y, fireR); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(soft, 'rgba(0,0,0,0.75)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    l.fillStyle = gr; l.fillRect(0, 0, W, H);
+    gr = l.createRadialGradient(ME.x, ME.y, 0, ME.x, ME.y, 250); gr.addColorStop(0, 'rgba(0,0,0,0.95)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    l.fillStyle = gr; cone(l, ME.x, ME.y, ME.a, 250, 0.36); l.fill();
+    g.drawImage(c, 0, 0);
+  }
+
+  const STYLES = [
+    { name: 'Charcoal and ember', pitch: 'A black-and-white charcoal drawing where only fire, muzzle flash and blood have colour. Zombies are smudges with pinprick eyes until the light finds them.',
+      build: 'Greyscale sprites plus a scribble overlay; colour kept for three things only.', cost: 'Low. Mostly a palette and texture change to the current renderer.', risk: 'Enemy types must read by silhouette alone.',
+      draw(g) {
+        const r = rng(11);
+        g.fillStyle = '#16161a'; g.fillRect(0, 0, W, H);
+        let gr = g.createRadialGradient(FIRE.x, FIRE.y, 10, FIRE.x, FIRE.y, 190); gr.addColorStop(0, '#b9b4aa'); gr.addColorStop(0.5, '#5a5853'); gr.addColorStop(1, 'rgba(22,22,26,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, W, H);
+        g.fillStyle = 'rgba(190,186,176,0.3)'; cone(g, ME.x, ME.y, ME.a, 240, 0.34); g.fill();
+        g.lineCap = 'round';
+        for (let i = 0; i < 1500; i++) { const x = r() * W, y = r() * H, a = -0.7 + r() * 0.3, l = 6 + r() * 16; g.strokeStyle = `rgba(${r() < 0.6 ? '0,0,0' : '230,226,214'},${0.05 + r() * 0.12})`; g.lineWidth = 0.6 + r(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); }
+        for (const [x, y] of WALLS) { g.fillStyle = '#0a0a0c'; g.fillRect(x + 5, y + 6, T, T); g.fillStyle = '#8f8b83'; g.fillRect(x, y, T, T); g.strokeStyle = '#0b0b0d'; for (let k = 0; k < 5; k++) { g.lineWidth = 0.8 + r(); g.strokeRect(x + r() * 2 - 1, y + r() * 2 - 1, T, T); g.beginPath(); g.moveTo(x + 2, y + 6 + k * 6); g.lineTo(x + T - 2, y + 5 + k * 6 + r() * 3); g.stroke(); } }
+        for (const [x, y, a, s] of ZS) at(g, x, y, a, () => { g.fillStyle = '#060607'; torso(g, s); g.fill(); head(g, s); g.fill(); g.strokeStyle = '#060607'; g.lineWidth = s * 0.34; arms(g, s, 1.35); g.stroke(); for (let k = 0; k < 7; k++) { g.strokeStyle = 'rgba(6,6,7,0.5)'; g.lineWidth = 1; g.beginPath(); g.moveTo(-s, r() * s * 2 - s); g.lineTo(-s * (1.4 + r()), r() * s * 2 - s); g.stroke(); } eyes(g, s, '#f4f1e8', 1.3); });
+        at(g, ME.x, ME.y, ME.a, () => { g.fillStyle = '#d9d5cb'; torso(g, 10); g.fill(); g.strokeStyle = '#0b0b0d'; g.lineWidth = 1.4; g.stroke(); g.fillStyle = '#0b0b0d'; g.fillRect(6, 2, 20, 3.4); head(g, 9); g.fillStyle = '#f1eee6'; g.fill(); g.stroke(); });
+        at(g, TURRET.x, TURRET.y, TURRET.a, () => { g.fillStyle = '#3a3936'; g.beginPath(); g.arc(0, 0, 10, 0, TAU); g.fill(); g.fillStyle = '#0b0b0d'; g.fillRect(0, -2.5, 22, 5); });
+        for (const [x, y, s] of BLOOD) { g.fillStyle = '#b3120e'; for (let k = 0; k < 9; k++) { g.beginPath(); g.ellipse(x + (r() - 0.5) * s * 2.2, y + (r() - 0.5) * s * 1.6, s * (0.15 + r() * 0.5), s * (0.1 + r() * 0.3), r() * 3, 0, TAU); g.fill(); } }
+        g.strokeStyle = '#ffb040'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(ME.x + 24, ME.y + 12); g.lineTo(SHOT.x, SHOT.y); g.stroke();
+        for (let k = 0; k < 6; k++) { g.fillStyle = ['#b3120e', '#e2501a', '#ff8a24', '#ffb648', '#ffe08a', '#fff6d8'][k]; g.beginPath(); g.ellipse(FIRE.x + Math.sin(k * 2.3) * 3, FIRE.y - k * 2.4, 11 - k * 1.7, 15 - k * 2.2, 0, 0, TAU); g.fill(); }
+        grain(g, 5000, 0.16, 3); vignette(g, 0.6);
+      } },
+    { name: 'Painted grit', pitch: 'The direction the game is already heading, pushed to the end: hand-painted ground, weathered metal, real shadows from the fire, cold moonlight against warm flame.',
+      build: 'Higher-resolution painted ground and pre-rendered shaded sprites, light map with cast shadows.', cost: 'Medium. Builds on what exists; most work is sprite quality.', risk: 'Least distinctive of the ten. Lives or dies on detail.',
+      draw(g) {
+        const r = rng(21);
+        g.fillStyle = '#4a4a2c'; g.fillRect(0, 0, W, H);
+        for (let i = 0; i < 520; i++) { const x = r() * W, y = r() * H, s = 10 + r() * 46, c = ['62,74,40', '84,70,46', '40,48,28', '98,84,58'][(r() * 4) | 0], gr = g.createRadialGradient(x, y, 0, x, y, s); gr.addColorStop(0, `rgba(${c},0.5)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(x - s, y - s, s * 2, s * 2); }
+        let gr = g.createRadialGradient(FIRE.x, FIRE.y, 10, FIRE.x, FIRE.y, 130); gr.addColorStop(0, 'rgba(104,82,56,0.95)'); gr.addColorStop(1, 'rgba(104,82,56,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+        for (let i = 0; i < 2600; i++) { const x = r() * W, y = r() * H; g.strokeStyle = `rgba(${70 + r() * 60 | 0},${90 + r() * 50 | 0},40,0.5)`; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + r() * 4 - 2, y - 3 - r() * 5); g.stroke(); }
+        const sh = (x, y, w, h, k) => { const dx = x - FIRE.x, dy = y - FIRE.y, d = Math.hypot(dx, dy) || 1; g.fillStyle = 'rgba(0,0,0,0.42)'; g.beginPath(); g.ellipse(x + dx / d * k, y + dy / d * k, w, h, 0, 0, TAU); g.fill(); };
+        for (const [x, y] of WALLS) { sh(x + 16, y + 16, 20, 20, 11); const lg = g.createLinearGradient(x, y, x + T, y + T); lg.addColorStop(0, '#9aa4ae'); lg.addColorStop(1, '#3c434b'); g.fillStyle = '#14171b'; g.fillRect(x, y, T, T); g.fillStyle = lg; g.fillRect(x + 1.5, y + 1.5, T - 3, T - 3); for (let k = 0; k < 6; k++) { g.fillStyle = k % 2 ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.14)'; g.fillRect(x + 2 + k * 4.8, y + 2, 2.2, T - 4); } g.fillStyle = 'rgba(122,62,26,0.5)'; g.beginPath(); g.arc(x + 6 + r() * 20, y + 6 + r() * 20, 3 + r() * 5, 0, TAU); g.fill(); }
+        for (const [x, y, s] of BLOOD) { g.fillStyle = 'rgba(70,8,6,0.85)'; for (let k = 0; k < 7; k++) { g.beginPath(); g.ellipse(x + (r() - 0.5) * s * 2, y + (r() - 0.5) * s * 1.4, s * (0.2 + r() * 0.5), s * (0.15 + r() * 0.3), r() * 3, 0, TAU); g.fill(); } }
+        for (const [x, y, a, s] of ZS) { sh(x, y, s, s * 0.9, s * 0.7); at(g, x, y, a, () => { g.strokeStyle = '#5f6a4e'; g.lineWidth = s * 0.34; g.lineCap = 'round'; arms(g, s, 1.35); g.stroke(); let q = g.createRadialGradient(-2, -3, 1, 0, 0, s); q.addColorStop(0, '#5b5a4c'); q.addColorStop(1, '#23251d'); g.fillStyle = q; torso(g, s); g.fill(); q = g.createRadialGradient(s * 0.4, -2, 1, s * 0.5, 0, s * 0.55); q.addColorStop(0, '#8d9a78'); q.addColorStop(1, '#3d4633'); g.fillStyle = q; head(g, s); g.fill(); g.fillStyle = '#5e0c0a'; g.beginPath(); g.ellipse(-s * 0.1, s * 0.3, s * 0.3, s * 0.18, 0.5, 0, TAU); g.fill(); eyes(g, s, '#ffd870', 1.2); }); }
+        sh(ME.x, ME.y, 12, 11, 6);
+        at(g, ME.x, ME.y, ME.a, () => { g.fillStyle = '#2b2e35'; g.fillRect(6, 2, 22, 4); const q = g.createLinearGradient(-6, -10, 6, 10); q.addColorStop(0, '#d8554a'); q.addColorStop(1, '#7a2a24'); g.fillStyle = q; torso(g, 10); g.fill(); g.fillStyle = '#d8ae88'; head(g, 9); g.fill(); g.fillStyle = '#5a1f1a'; g.beginPath(); g.arc(3.6, 0, 5, 1, TAU - 1); g.fill(); });
+        at(g, TURRET.x, TURRET.y, TURRET.a, () => { g.fillStyle = '#1c1f24'; g.fillRect(-13, -13, 26, 26); g.fillStyle = '#20242a'; g.fillRect(2, -2.5, 22, 5); const q = g.createLinearGradient(-8, -8, 8, 8); q.addColorStop(0, '#8c98a6'); q.addColorStop(1, '#2c333c'); g.fillStyle = q; g.beginPath(); g.arc(0, 0, 9, 0, TAU); g.fill(); });
+        dark(g, 'rgba(6,10,26,0.9)', 210, 0.45);
+        g.globalCompositeOperation = 'lighter';
+        gr = g.createRadialGradient(FIRE.x, FIRE.y, 0, FIRE.x, FIRE.y, 170); gr.addColorStop(0, 'rgba(255,130,44,0.36)'); gr.addColorStop(1, 'rgba(255,130,44,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+        for (let k = 0; k < 6; k++) { g.fillStyle = ['rgba(168,40,12,0.7)', 'rgba(226,80,26,0.7)', 'rgba(255,138,36,0.7)', 'rgba(255,182,72,0.7)', 'rgba(255,224,138,0.8)', 'rgba(255,246,216,0.9)'][k]; g.beginPath(); g.ellipse(FIRE.x + Math.sin(k * 2.3) * 3, FIRE.y - k * 2.6, 10 - k * 1.5, 15 - k * 2.2, 0, 0, TAU); g.fill(); }
+        g.strokeStyle = 'rgba(255,225,150,0.9)'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(ME.x + 26, ME.y + 13); g.lineTo(SHOT.x, SHOT.y); g.stroke();
+        for (const [x, y, a, s] of ZS) { g.fillStyle = 'rgba(255,216,112,0.9)'; g.beginPath(); g.arc(x + Math.cos(a) * s * 0.7 - Math.sin(a) * s * 0.2, y + Math.sin(a) * s * 0.7 + Math.cos(a) * s * 0.2, 1.1, 0, TAU); g.arc(x + Math.cos(a) * s * 0.7 + Math.sin(a) * s * 0.2, y + Math.sin(a) * s * 0.7 - Math.cos(a) * s * 0.2, 1.1, 0, TAU); g.fill(); }
+        g.globalCompositeOperation = 'source-over'; grain(g, 3000, 0.08, 5); vignette(g, 0.5);
+      } },
+    { name: 'Night-vision feed', pitch: 'The whole game seen through a helmet camera: green phosphor, scan lines, bloom on anything hot. Bodies glow; the campfire blows out the sensor.',
+      build: 'Draw in greyscale, then one full-screen tint, scan-line and bloom pass.', cost: 'Low. A post-process over simple sprites; very cheap on phones.', risk: 'One colour for hours can tire the eyes. Could be a night-only mode.',
+      draw(g) {
+        const r = rng(31);
+        g.fillStyle = '#2c2c2c'; g.fillRect(0, 0, W, H);
+        for (let i = 0; i < 900; i++) { const v = 30 + r() * 40 | 0; g.fillStyle = `rgba(${v},${v},${v},0.5)`; g.fillRect(r() * W, r() * H, 3 + r() * 9, 2 + r() * 5); }
+        for (const [x, y] of WALLS) { g.fillStyle = '#6a6a6a'; g.fillRect(x, y, T, T); g.strokeStyle = '#1a1a1a'; g.lineWidth = 1.5; g.strokeRect(x + 0.5, y + 0.5, T - 1, T - 1); g.fillStyle = '#4c4c4c'; g.fillRect(x + 4, y + 4, T - 8, 3); }
+        for (const [x, y, a, s] of ZS) at(g, x, y, a, () => { g.shadowColor = '#fff'; g.shadowBlur = 8; g.fillStyle = '#c8c8c8'; torso(g, s); g.fill(); head(g, s); g.fill(); g.strokeStyle = '#c8c8c8'; g.lineWidth = s * 0.3; g.lineCap = 'round'; arms(g, s, 1.35); g.stroke(); g.shadowBlur = 0; eyes(g, s, '#fff', 1.6); });
+        at(g, ME.x, ME.y, ME.a, () => { g.fillStyle = '#e6e6e6'; torso(g, 10); g.fill(); head(g, 9); g.fill(); g.fillStyle = '#888'; g.fillRect(6, 2, 22, 4); });
+        at(g, TURRET.x, TURRET.y, TURRET.a, () => { g.fillStyle = '#7a7a7a'; g.beginPath(); g.arc(0, 0, 10, 0, TAU); g.fill(); g.fillRect(0, -2.5, 22, 5); });
+        g.fillStyle = 'rgba(255,255,255,0.16)'; cone(g, ME.x, ME.y, ME.a, 250, 0.34); g.fill();
+        let gr = g.createRadialGradient(FIRE.x, FIRE.y, 0, FIRE.x, FIRE.y, 90); gr.addColorStop(0, '#fff'); gr.addColorStop(0.25, 'rgba(255,255,255,0.85)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+        g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(ME.x + 26, ME.y + 13); g.lineTo(SHOT.x, SHOT.y); g.stroke();
+        g.globalCompositeOperation = 'multiply'; g.fillStyle = '#35f56a'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+        g.fillStyle = 'rgba(0,0,0,0.26)'; for (let y = 0; y < H; y += 3) g.fillRect(0, y, W, 1);
+        grain(g, 7000, 0.2, 9); vignette(g, 0.85);
+        g.strokeStyle = 'rgba(160,255,180,0.7)'; g.lineWidth = 1; g.strokeRect(18, 18, W - 36, H - 36);
+        g.beginPath(); g.moveTo(W / 2 - 12, H / 2); g.lineTo(W / 2 + 12, H / 2); g.moveTo(W / 2, H / 2 - 12); g.lineTo(W / 2, H / 2 + 12); g.stroke();
+        g.fillStyle = 'rgba(160,255,180,0.85)'; g.font = '12px monospace'; g.fillText('CAM 02  NIGHT 07  02:41:17', 28, 36); g.fillText('41 CONTACTS', W - 118, H - 28);
+      } },
+    { name: 'Cut-paper diorama', pitch: 'A shadow-box theatre made of card: every wall, body and flame is a cut shape lifted off the layer below, with hard paper shadows. Creepy in a storybook way.',
+      build: 'Flat vector shapes with offset shadows; a paper-fibre texture over everything.', cost: 'Low to medium. Flat shapes are the cheapest art to make and animate.', risk: 'Gore reads as red confetti; less visceral.',
+      draw(g) {
+        const r = rng(41);
+        g.fillStyle = '#243746'; g.fillRect(0, 0, W, H);
+        const layer = (col, off, amp, seed) => { const q = rng(seed); g.save(); g.shadowColor = 'rgba(0,0,0,0.45)'; g.shadowOffsetX = 3; g.shadowOffsetY = 4; g.shadowBlur = 5; g.fillStyle = col; g.beginPath(); g.moveTo(FIRE.x + off, FIRE.y); for (let i = 0; i <= 40; i++) { const a = i / 40 * TAU, d = off + q() * amp; g.lineTo(FIRE.x + Math.cos(a) * d * 1.5, FIRE.y + Math.sin(a) * d); } g.fill(); g.restore(); };
+        layer('#2f4a52', 210, 26, 1); layer('#4b6652', 150, 22, 2); layer('#8a7a56', 88, 16, 3);
+        const cut = (fn, col) => { g.save(); g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowOffsetX = 3; g.shadowOffsetY = 4; g.shadowBlur = 3; g.fillStyle = col; fn(); g.fill(); g.restore(); };
+        for (const [x, y] of WALLS) { cut(() => { g.beginPath(); g.rect(x + 1, y + 1, T - 2, T - 2); }, '#b9bfc4'); g.fillStyle = '#8d959c'; g.fillRect(x + 5, y + 8, T - 10, 3); g.fillRect(x + 5, y + 20, T - 10, 3); }
+        for (const [x, y, s] of BLOOD) for (let k = 0; k < 5; k++) cut(() => { g.beginPath(); g.arc(x + (r() - 0.5) * s * 2, y + (r() - 0.5) * s * 1.4, 2 + r() * s * 0.4, 0, TAU); }, '#b3242a');
+        for (const [x, y, a, s] of ZS) at(g, x, y, a, () => { g.save(); g.shadowColor = 'rgba(0,0,0,0.5)'; g.shadowOffsetX = 3; g.shadowOffsetY = 4; g.shadowBlur = 3; g.strokeStyle = '#7d9a6a'; g.lineWidth = s * 0.36; g.lineCap = 'butt'; arms(g, s, 1.35); g.stroke(); g.restore(); cut(() => torso(g, s), '#5d6f7a'); cut(() => head(g, s), '#a9c08a'); eyes(g, s, '#1b1b1b', 1.5); g.strokeStyle = '#1b1b1b'; g.lineWidth = 1; g.beginPath(); g.moveTo(s * 0.9, -2); g.lineTo(s * 0.9, 2); g.stroke(); });
+        at(g, ME.x, ME.y, ME.a, () => { cut(() => { g.beginPath(); g.rect(6, 2, 22, 4); }, '#2a2a2a'); cut(() => torso(g, 10), '#e0584e'); cut(() => head(g, 9), '#f0cfa8'); });
+        at(g, TURRET.x, TURRET.y, TURRET.a, () => { cut(() => { g.beginPath(); g.rect(0, -3, 22, 6); }, '#3a3f45'); cut(() => { g.beginPath(); g.arc(0, 0, 10, 0, TAU); }, '#7f8a94'); });
+        g.fillStyle = 'rgba(255,240,190,0.2)'; cone(g, ME.x, ME.y, ME.a, 230, 0.34); g.fill();
+        [['#c8401a', 17], ['#f08a2a', 12], ['#ffd070', 7]].forEach(([c, s], k) => cut(() => { g.beginPath(); g.moveTo(FIRE.x - s * 0.8, FIRE.y + 6); g.quadraticCurveTo(FIRE.x - s, FIRE.y - s * 0.6, FIRE.x + (k - 1) * 3, FIRE.y - s * 1.5); g.quadraticCurveTo(FIRE.x + s, FIRE.y - s * 0.5, FIRE.x + s * 0.8, FIRE.y + 6); g.closePath(); }, c));
+        g.strokeStyle = '#fff3c0'; g.lineWidth = 2; g.setLineDash([7, 5]); g.beginPath(); g.moveTo(ME.x + 26, ME.y + 13); g.lineTo(SHOT.x, SHOT.y); g.stroke(); g.setLineDash([]);
+        for (let i = 0; i < 2600; i++) { g.strokeStyle = `rgba(255,255,255,${r() * 0.05})`; const x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); g.lineTo(x + r() * 8 - 4, y + r() * 8 - 4); g.stroke(); }
+        vignette(g, 0.45);
+      } },
+    { name: '16-bit pixel horror', pitch: 'Chunky sprites, a strict 16-colour palette, and darkness drawn as dithered rings instead of smooth gradients. Reads instantly, even on a small phone.',
+      build: 'Render the world to a 320x180 buffer and scale it up with hard pixels.', cost: 'Low to run (fewest pixels of all). All sprites must be redrawn by hand.', risk: 'A crowded genre: needs a strong palette to stand out.',
+      draw(g) {
+        const S = 4, w = W / S, h = H / S, c = mk(w, h), p = c.getContext('2d'), r = rng(51);
+        const px = (x, y, ww, hh, col) => { p.fillStyle = col; p.fillRect(Math.round(x / S), Math.round(y / S), Math.max(1, Math.round(ww / S)), Math.max(1, Math.round(hh / S))); };
+        p.fillStyle = '#2d3b24'; p.fillRect(0, 0, w, h);
+        for (let i = 0; i < 700; i++) px(r() * W, r() * H, 4, 4, ['#35472a', '#24301e', '#3f5230', '#4a3f2a'][(r() * 4) | 0]);
+        for (let i = 0; i < 260; i++) { const a = r() * TAU, d = Math.sqrt(r()) * 76; px(FIRE.x + Math.cos(a) * d * 1.3, FIRE.y + Math.sin(a) * d, 4, 4, r() < 0.5 ? '#6a5638' : '#57462e'); }
+        for (const [x, y] of WALLS) { px(x, y, T, T, '#1a1c20'); px(x + 4, y + 4, T - 8, T - 8, '#7c8794'); px(x + 4, y + 4, T - 8, 4, '#b4bcc6'); px(x + 4, y + T - 8, T - 8, 4, '#4a525c'); px(x + 12, y + 12, 4, 4, '#1a1c20'); }
+        for (const [x, y, s] of BLOOD) for (let k = 0; k < 8; k++) px(x + (r() - 0.5) * s * 2.4, y + (r() - 0.5) * s * 1.6, 4, 4, r() < 0.6 ? '#7a1010' : '#a81818');
+        for (const [x, y, a, s] of ZS) { const ca = Math.cos(a), sa = Math.sin(a), k = s > 14 ? 1.5 : 1; px(x - 8 * k, y - 8 * k, 16 * k, 16 * k, '#3c4a34'); px(x - 4 * k, y - 4 * k, 12 * k, 8 * k, '#55406a'); px(x + ca * 8 * k - 4, y + sa * 8 * k - 4, 8 * k, 8 * k, '#8fae6a'); px(x + ca * 16 * k - sa * 6, y + sa * 16 * k + ca * 6, 4, 4, '#8fae6a'); px(x + ca * 16 * k + sa * 6, y + sa * 16 * k - ca * 6, 4, 4, '#8fae6a'); px(x + ca * 10 * k - sa * 3, y + sa * 10 * k + ca * 3, 4, 4, '#ffe050'); }
+        px(ME.x - 8, ME.y - 8, 16, 16, '#c8443c'); px(ME.x, ME.y - 4, 8, 8, '#f0c8a0'); px(ME.x + 8, ME.y + 4, 16, 4, '#1a1c20');
+        px(TURRET.x - 12, TURRET.y - 12, 24, 24, '#1a1c20'); px(TURRET.x - 8, TURRET.y - 8, 16, 16, '#5a6470'); px(TURRET.x + 4, TURRET.y - 8, 16, 4, '#b4bcc6');
+        for (let k = 0; k < 9; k++) px(ME.x + 30 + k * 9, ME.y + 14 + k * 4.6, 4, 4, '#ffe050');
+        px(FIRE.x - 8, FIRE.y - 4, 16, 12, '#c8401a'); px(FIRE.x - 4, FIRE.y - 12, 8, 16, '#f08a2a'); px(FIRE.x - 4, FIRE.y - 4, 4, 8, '#ffe050'); px(FIRE.x, FIRE.y - 20, 4, 8, '#f08a2a');
+        // dithered darkness
+        const img = p.getImageData(0, 0, w, h), d = img.data, B = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const fx = x * S, fy = y * S; let L = Math.max(0, 1 - Math.hypot((fx - FIRE.x) / 1.25, fy - FIRE.y) / 150);
+          const dx = fx - ME.x, dy = fy - ME.y, dd = Math.hypot(dx, dy); let da = Math.atan2(dy, dx) - ME.a; da = Math.abs(Math.atan2(Math.sin(da), Math.cos(da)));
+          if (da < 0.36 && dd < 250) L = Math.max(L, 1 - dd / 250);
+          const lvl = Math.min(3, Math.floor(L * 3 + (B[(y & 3) * 4 + (x & 3)] / 16)));
+          const m = [0.36, 0.58, 0.82, 1][lvl], i = (y * w + x) * 4;
+          d[i] = d[i] * m * (lvl < 2 ? 0.8 : 1); d[i + 1] = d[i + 1] * m * (lvl < 2 ? 0.9 : 1); d[i + 2] = Math.min(255, d[i + 2] * m + (lvl < 2 ? 14 : 0));
+        }
+        p.putImageData(img, 0, 0);
+        for (const [x, y, a, s] of ZS) { p.fillStyle = '#ffe050'; p.fillRect(Math.round((x + Math.cos(a) * 10) / S), Math.round((y + Math.sin(a) * 10) / S), 1, 1); }
+        g.imageSmoothingEnabled = false; g.drawImage(c, 0, 0, W, H);
+      } },
+    { name: 'Woodcut print', pitch: 'A medieval plague broadsheet: black ink carved with bone-white lines, light shown as rays cut out of the dark, and one spot colour, red, used only for blood and eyes.',
+      build: 'Two-tone sprites with hatching baked in; light rendered as line density.', cost: 'Medium. Unusual light model, but only three inks to manage.', risk: 'High contrast everywhere: needs care so the HUD stays readable.',
+      draw(g) {
+        const r = rng(61), INK = '#0d0b09', BONE = '#e6d9bc', RED = '#b01a14';
+        g.fillStyle = INK; g.fillRect(0, 0, W, H);
+        g.strokeStyle = BONE; g.lineCap = 'butt';
+        for (let i = 0; i < 150; i++) { const a = i / 150 * TAU + r() * 0.02, d0 = 22 + r() * 10, d1 = 60 + r() * 120; g.lineWidth = 0.6 + r() * 1.6; g.beginPath(); g.moveTo(FIRE.x + Math.cos(a) * d0, FIRE.y + Math.sin(a) * d0); g.lineTo(FIRE.x + Math.cos(a) * d1, FIRE.y + Math.sin(a) * d1); g.stroke(); }
+        for (let i = 0; i < 26; i++) { const a = ME.a - 0.33 + i / 26 * 0.66, d1 = 120 + r() * 120; g.lineWidth = 0.8 + r(); g.beginPath(); g.moveTo(ME.x + Math.cos(a) * 26, ME.y + Math.sin(a) * 26); g.lineTo(ME.x + Math.cos(a) * d1, ME.y + Math.sin(a) * d1); g.stroke(); }
+        for (let i = 0; i < 500; i++) { const x = r() * W, y = r() * H; if (Math.hypot(x - FIRE.x, y - FIRE.y) < 190) continue; g.lineWidth = 0.7; g.globalAlpha = 0.35; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 5, y - 3); g.stroke(); } g.globalAlpha = 1;
+        for (const [x, y] of WALLS) { g.fillStyle = BONE; g.fillRect(x + 1, y + 1, T - 2, T - 2); g.strokeStyle = INK; g.lineWidth = 1.3; for (let k = 0; k < 7; k++) { g.beginPath(); g.moveTo(x + 3 + k * 4.2, y + T - 3); g.lineTo(x + 3 + k * 4.2 + 4, y + T * 0.45 + k * 1.2); g.stroke(); } g.strokeRect(x + 3, y + 3, T - 6, T - 6); }
+        for (const [x, y, s] of BLOOD) { g.fillStyle = RED; for (let k = 0; k < 6; k++) { g.beginPath(); g.ellipse(x + (r() - 0.5) * s * 2, y + (r() - 0.5) * s * 1.3, s * (0.2 + r() * 0.5), s * (0.1 + r() * 0.3), r() * 3, 0, TAU); g.fill(); } }
+        for (const [x, y, a, s] of ZS) at(g, x, y, a, () => { g.fillStyle = BONE; g.strokeStyle = BONE; g.lineWidth = s * 0.3; g.lineCap = 'round'; arms(g, s, 1.4); g.stroke(); torso(g, s); g.fill(); head(g, s); g.fill(); g.strokeStyle = INK; g.lineWidth = 1.1; for (let k = -3; k <= 3; k++) { g.beginPath(); g.moveTo(-s * 0.6, k * s * 0.26); g.lineTo(s * 0.1, k * s * 0.26 + 2); g.stroke(); } head(g, s); g.stroke(); eyes(g, s, RED, 1.7); });
+        at(g, ME.x, ME.y, ME.a, () => { g.fillStyle = BONE; g.fillRect(6, 2, 22, 3.5); torso(g, 10); g.fill(); g.strokeStyle = INK; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-4, -8); g.lineTo(-4, 8); g.moveTo(0, -9); g.lineTo(0, 9); g.stroke(); g.fillStyle = BONE; head(g, 9); g.fill(); g.stroke(); });
+        at(g, TURRET.x, TURRET.y, TURRET.a, () => { g.fillStyle = BONE; g.fillRect(0, -2.5, 22, 5); g.beginPath(); g.arc(0, 0, 10, 0, TAU); g.fill(); g.strokeStyle = INK; g.lineWidth = 1.2; g.beginPath(); g.arc(0, 0, 6, 0, TAU); g.stroke(); });
+        g.fillStyle = BONE; g.beginPath(); for (let i = 0; i <= 16; i++) { const a = i / 16 * TAU, d = i % 2 ? 9 : 19; g.lineTo(FIRE.x + Math.cos(a) * d, FIRE.y + Math.sin(a) * d); } g.fill();
+        g.fillStyle = RED; g.beginPath(); g.arc(FIRE.x, FIRE.y, 6, 0, TAU); g.fill();
+        g.strokeStyle = BONE; g.lineWidth = 2.2; g.beginPath(); g.moveTo(ME.x + 26, ME.y + 13); g.lineTo(SHOT.x, SHOT.y); g.stroke();
+        g.strokeStyle = BONE; g.lineWidth = 5; g.strokeRect(8, 8, W - 16, H - 16); g.lineWidth = 1; g.strokeRect(16, 16, W - 32, H - 32);
+        grain(g, 2500, 0.12, 2);
+      } },
+    { name: 'Low-poly tabletop', pitch: 'The camera tips over to three-quarter view. Walls gain height, bodies become faceted figures, and long shadows stretch away from the fire across triangulated ground.',
+      build: 'Models built and rendered to sprite sheets in Blender (8 facings), or a real WebGL scene.', cost: 'High. A new camera angle touches aiming, building and every sprite.', risk: 'Biggest rewrite. Tall walls can hide zombies behind them.',
+      draw(g) {
+        const r = rng(71), P = (x, y, z) => [x * 0.92 + 26, y * 0.6 + 96 - (z || 0)];
+        g.fillStyle = '#0c1016'; g.fillRect(0, 0, W, H);
+        const N = 22, M = 14, pts = [];
+        for (let j = 0; j <= M; j++) for (let i = 0; i <= N; i++) pts.push([i * W / N + (r() - 0.5) * 16, j * H / M + (r() - 0.5) * 14]);
+        const lit = (x, y) => Math.max(0.1, 1 - Math.hypot(x - FIRE.x, y - FIRE.y) / 330);
+        for (let j = 0; j < M; j++) for (let i = 0; i < N; i++) { const a = pts[j * (N + 1) + i], b = pts[j * (N + 1) + i + 1], c = pts[(j + 1) * (N + 1) + i], d = pts[(j + 1) * (N + 1) + i + 1]; for (const tri of [[a, b, c], [b, d, c]]) { const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3, L = lit(cx, cy) * (0.8 + r() * 0.4); g.fillStyle = `rgb(${50 + 150 * L * L | 0},${62 + 78 * L | 0},${50 + 10 * L | 0})`; g.beginPath(); tri.forEach((q, k) => { const s = P(q[0], q[1]); k ? g.lineTo(s[0], s[1]) : g.moveTo(s[0], s[1]); }); g.fill(); } }
+        const quad = (a, b, c, d, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.fill(); };
+        const shadow = (x, y, w, len) => { const dx = x - FIRE.x, dy = y - FIRE.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d; quad(P(x - uy * w, y + ux * w), P(x + uy * w, y - ux * w), P(x + uy * w + ux * len, y - ux * w + uy * len), P(x - uy * w + ux * len, y + ux * w + uy * len), 'rgba(4,6,10,0.5)'); };
+        const things = [];
+        for (const [x, y] of WALLS) things.push({ y: y + T, f() { shadow(x + 16, y + 16, 16, 46); const h = 26, L = lit(x, y); quad(P(x, y + T), P(x + T, y + T), P(x + T, y + T, h), P(x, y + T, h), `rgb(${60 + 120 * L | 0},${64 + 70 * L | 0},${70 + 30 * L | 0})`); quad(P(x + T, y), P(x + T, y + T), P(x + T, y + T, h), P(x + T, y, h), '#2a2f36'); quad(P(x, y, h), P(x + T, y, h), P(x + T, y + T, h), P(x, y + T, h), `rgb(${110 + 110 * L | 0},${116 + 70 * L | 0},${124 + 20 * L | 0})`); } });
+        const fig = (x, y, s, body, hd, isMe) => ({ y, f() { shadow(x, y, s * 0.7, s * 4); const b = P(x, y), L = lit(x, y); g.fillStyle = body; g.beginPath(); g.moveTo(b[0] - s * 0.8, b[1]); g.lineTo(b[0] + s * 0.8, b[1]); g.lineTo(b[0] + s * 0.55, b[1] - s * 1.9); g.lineTo(b[0] - s * 0.55, b[1] - s * 1.9); g.fill(); g.fillStyle = `rgba(255,150,60,${0.45 * L})`; g.beginPath(); g.moveTo(b[0] - s * 0.8, b[1]); g.lineTo(b[0] - s * 0.2, b[1]); g.lineTo(b[0] - s * 0.15, b[1] - s * 1.9); g.lineTo(b[0] - s * 0.55, b[1] - s * 1.9); g.fill(); g.fillStyle = hd; g.beginPath(); for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; g.lineTo(b[0] + Math.cos(a) * s * 0.62, b[1] - s * 2.35 + Math.sin(a) * s * 0.62); } g.fill(); if (!isMe) { g.fillStyle = '#ffe070'; g.fillRect(b[0] - s * 0.3, b[1] - s * 2.4, 2, 2); g.fillRect(b[0] + s * 0.15, b[1] - s * 2.4, 2, 2); } } });
+        for (const [x, y, a, s] of ZS) things.push(fig(x, y, s, '#3b4a3a', '#7f9a66', false));
+        things.push(fig(ME.x, ME.y, 10, '#c0453c', '#e8c39c', true));
+        things.push({ y: TURRET.y, f() { const b = P(TURRET.x, TURRET.y); quad([b[0] - 11, b[1]], [b[0] + 11, b[1]], [b[0] + 8, b[1] - 16], [b[0] - 8, b[1] - 16], '#58626e'); quad([b[0], b[1] - 16], [b[0] + 24, b[1] - 22], [b[0] + 24, b[1] - 18], [b[0], b[1] - 11], '#20242a'); } });
+        things.push({ y: FIRE.y, f() { const b = P(FIRE.x, FIRE.y); [['#c8401a', 16], ['#f08a2a', 11], ['#ffd870', 6]].forEach(([c, s]) => { g.fillStyle = c; g.beginPath(); g.moveTo(b[0] - s * 0.7, b[1]); g.lineTo(b[0], b[1] - s * 2); g.lineTo(b[0] + s * 0.7, b[1]); g.fill(); }); } });
+        for (const [x, y, s] of BLOOD) { const b = P(x, y); g.fillStyle = 'rgba(120,14,12,0.9)'; g.beginPath(); for (let k = 0; k < 7; k++) { const a = k / 7 * TAU; g.lineTo(b[0] + Math.cos(a) * s * (0.7 + r() * 0.6), b[1] + Math.sin(a) * s * 0.5 * (0.7 + r() * 0.6)); } g.fill(); }
+        things.sort((a, b) => a.y - b.y).forEach((t) => t.f());
+        const a0 = P(ME.x + 20, ME.y + 9, 14), a1 = P(SHOT.x, SHOT.y, 10); g.strokeStyle = '#ffe9a8'; g.lineWidth = 1.8; g.beginPath(); g.moveTo(a0[0], a0[1]); g.lineTo(a1[0], a1[1]); g.stroke();
+        vignette(g, 0.7);
+      } },
+    { name: 'Neon wireframe', pitch: 'Pure black, glowing outlines. The camp is cyan, the dead are acid green, damage is hot pink. Every explosion is a burst of light trails. An arcade machine from a bad future.',
+      build: 'Stroke-only vector shapes with additive glow; particles do most of the work.', cost: 'Low. Outlines are cheap; glow needs care on phones (pre-blurred sprites).', risk: 'Not gritty at all. A different game mood: arcade, not dread.',
+      draw(g) {
+        const r = rng(81);
+        g.fillStyle = '#04040a'; g.fillRect(0, 0, W, H);
+        g.strokeStyle = 'rgba(60,90,160,0.22)'; g.lineWidth = 1; g.beginPath(); for (let x = 0; x <= W; x += T) { g.moveTo(x, 0); g.lineTo(x, H); } for (let y = 8; y <= H; y += T) { g.moveTo(0, y); g.lineTo(W, y); } g.stroke();
+        g.globalCompositeOperation = 'lighter'; g.lineJoin = 'round'; g.lineCap = 'round';
+        const glow = (col, lw, fn) => { g.strokeStyle = col; g.shadowColor = col; g.shadowBlur = 14; g.lineWidth = lw; fn(); g.stroke(); g.shadowBlur = 4; g.strokeStyle = '#fff'; g.lineWidth = lw * 0.35; g.stroke(); g.shadowBlur = 0; };
+        for (const [x, y] of WALLS) glow('#22d8ff', 2.2, () => { g.beginPath(); g.rect(x + 3, y + 3, T - 6, T - 6); g.moveTo(x + 3, y + 3); g.lineTo(x + T - 3, y + T - 3); });
+        for (const [x, y, a, s] of ZS) at(g, x, y, a, () => { glow(s > 14 ? '#ff7a1a' : '#9dff3a', 2, () => { torso(g, s); }); glow(s > 14 ? '#ff7a1a' : '#9dff3a', 2, () => { head(g, s); }); glow(s > 14 ? '#ff7a1a' : '#9dff3a', 2, () => { arms(g, s, 1.4); }); });
+        at(g, ME.x, ME.y, ME.a, () => { glow('#ffffff', 2.2, () => { g.beginPath(); g.moveTo(14, 0); g.lineTo(-9, -9); g.lineTo(-4, 0); g.lineTo(-9, 9); g.closePath(); }); });
+        at(g, TURRET.x, TURRET.y, TURRET.a, () => glow('#22d8ff', 2, () => { g.beginPath(); g.arc(0, 0, 9, 0, TAU); g.moveTo(9, 0); g.lineTo(24, 0); }));
+        glow('#ffb020', 2.4, () => { g.beginPath(); for (let i = 0; i <= 10; i++) { const a = i / 10 * TAU - 1.57, d = i % 2 ? 7 : 17; g.lineTo(FIRE.x + Math.cos(a) * d, FIRE.y + Math.sin(a) * d); } g.closePath(); });
+        glow('#ff3a8a', 2.6, () => { g.beginPath(); g.moveTo(ME.x + 18, ME.y + 8); g.lineTo(SHOT.x, SHOT.y); });
+        for (const [x, y, s] of BLOOD) for (let k = 0; k < 9; k++) { const a = r() * TAU, d = s * (0.6 + r() * 1.6); glow('#ff3a8a', 1.4, () => { g.beginPath(); g.moveTo(x + Math.cos(a) * d * 0.4, y + Math.sin(a) * d * 0.4); g.lineTo(x + Math.cos(a) * d, y + Math.sin(a) * d); }); }
+        g.strokeStyle = 'rgba(255,255,255,0.1)'; g.lineWidth = 1; cone(g, ME.x, ME.y, ME.a, 240, 0.34); g.stroke();
+        g.globalCompositeOperation = 'source-over'; vignette(g, 0.5);
+      } },
+    { name: 'Claymation set', pitch: 'A stop-motion miniature: plasticine figures with thumbprints, a cardboard camp on a felt table, shot close with a shallow lens so the edges fall out of focus. Funny until it is not.',
+      build: 'Sculpt and render sprites in Blender with clay shaders, animate on twos (12 fps poses).', cost: 'Medium to high. Needs Blender renders for every creature and build.', risk: 'Reads as charming. Horror would come from sound and animation, not the stills.',
+      draw(g) {
+        const r = rng(91), c = mk(W, H), q = c.getContext('2d');
+        q.fillStyle = '#5d6b3e'; q.fillRect(0, 0, W, H);
+        for (let i = 0; i < 9000; i++) { q.strokeStyle = `rgba(${r() < 0.5 ? '30,40,18' : '140,160,90'},0.16)`; const x = r() * W, y = r() * H; q.beginPath(); q.moveTo(x, y); q.lineTo(x + r() * 5 - 2.5, y + r() * 5 - 2.5); q.stroke(); }
+        let gr = q.createRadialGradient(FIRE.x, FIRE.y, 10, FIRE.x, FIRE.y, 120); gr.addColorStop(0, '#9a7a4e'); gr.addColorStop(0.8, '#8a6c44'); gr.addColorStop(1, 'rgba(138,108,68,0)'); q.fillStyle = gr; q.beginPath(); q.ellipse(FIRE.x, FIRE.y, 150, 110, 0, 0, TAU); q.fill();
+        const blob = (x, y, rx, ry, col, hi) => { q.fillStyle = 'rgba(0,0,0,0.3)'; q.beginPath(); q.ellipse(x + 5, y + 7, rx * 1.05, ry * 1.05, 0, 0, TAU); q.fill(); const gd = q.createRadialGradient(x - rx * 0.4, y - ry * 0.45, 1, x, y, Math.max(rx, ry) * 1.15); gd.addColorStop(0, hi); gd.addColorStop(0.4, col); gd.addColorStop(1, 'rgba(0,0,0,0.55)'); q.fillStyle = col; q.beginPath(); q.ellipse(x, y, rx, ry, 0, 0, TAU); q.fill(); q.fillStyle = gd; q.fill(); q.fillStyle = 'rgba(255,255,255,0.55)'; q.beginPath(); q.ellipse(x - rx * 0.4, y - ry * 0.45, rx * 0.2, ry * 0.13, -0.6, 0, TAU); q.fill(); q.strokeStyle = 'rgba(0,0,0,0.1)'; q.lineWidth = 0.7; for (let k = 1; k < 4; k++) { q.beginPath(); q.ellipse(x + rx * 0.25, y + ry * 0.2, rx * 0.12 * k, ry * 0.09 * k, 0.5, 0, TAU); q.stroke(); } };
+        for (const [x, y] of WALLS) { q.fillStyle = 'rgba(0,0,0,0.3)'; q.beginPath(); q.roundRect(x + 5, y + 7, T - 2, T - 2, 7); q.fill(); const gd = q.createLinearGradient(x, y, x + T, y + T); gd.addColorStop(0, '#d9b98a'); gd.addColorStop(1, '#8a6a40'); q.fillStyle = gd; q.beginPath(); q.roundRect(x + 1, y + 1, T - 2, T - 2, 7); q.fill(); q.strokeStyle = 'rgba(80,50,20,0.5)'; q.lineWidth = 2; q.beginPath(); q.moveTo(x + 6, y + 11); q.lineTo(x + T - 6, y + 11); q.moveTo(x + 6, y + 21); q.lineTo(x + T - 6, y + 21); q.stroke(); q.fillStyle = 'rgba(255,255,255,0.35)'; q.fillRect(x + 6, y + 4, 12, 2.5); }
+        for (const [x, y, s] of BLOOD) blob(x, y, s * 1.1, s * 0.7, '#b0161a', '#ff6a5a');
+        for (const [x, y, a, s] of ZS) { const ca = Math.cos(a), sa = Math.sin(a), col = s > 14 ? '#8a4a8a' : '#7fae5a', hi = s > 14 ? '#e0a8e0' : '#d8f0a8'; blob(x + ca * s * 1.1 - sa * s * 0.6, y + sa * s * 1.1 + ca * s * 0.6, s * 0.35, s * 0.35, col, hi); blob(x + ca * s * 1.2 + sa * s * 0.6, y + sa * s * 1.2 - ca * s * 0.6, s * 0.35, s * 0.35, col, hi); blob(x, y, s * 0.95, s * 0.95, '#4a5a78', '#a8b8d8'); blob(x + ca * s * 0.5, y + sa * s * 0.5, s * 0.62, s * 0.62, col, hi); q.fillStyle = '#fff'; q.beginPath(); q.arc(x + ca * s * 0.85 - sa * s * 0.25, y + sa * s * 0.85 + ca * s * 0.25, s * 0.2, 0, TAU); q.arc(x + ca * s * 0.85 + sa * s * 0.25, y + sa * s * 0.85 - ca * s * 0.25, s * 0.15, 0, TAU); q.fill(); q.fillStyle = '#111'; q.beginPath(); q.arc(x + ca * s * 0.92 - sa * s * 0.25, y + sa * s * 0.92 + ca * s * 0.25, s * 0.08, 0, TAU); q.fill(); }
+        blob(ME.x, ME.y, 11, 11, '#d84a3c', '#ffb0a0'); blob(ME.x + Math.cos(ME.a) * 5, ME.y + Math.sin(ME.a) * 5, 7, 7, '#f0c8a0', '#fff0dc');
+        q.save(); q.translate(ME.x, ME.y); q.rotate(ME.a); q.fillStyle = '#3a3a40'; q.beginPath(); q.roundRect(8, 3, 22, 5, 2.5); q.fill(); q.restore();
+        blob(TURRET.x, TURRET.y, 12, 12, '#8a96a4', '#e0e8f0'); q.save(); q.translate(TURRET.x, TURRET.y); q.rotate(TURRET.a); q.fillStyle = '#4a525c'; q.beginPath(); q.roundRect(4, -3, 22, 6, 3); q.fill(); q.restore();
+        blob(FIRE.x, FIRE.y, 15, 15, '#e0501a', '#ffc070'); blob(FIRE.x - 1, FIRE.y - 5, 9, 11, '#ffa030', '#fff0a0'); blob(FIRE.x, FIRE.y - 8, 4.5, 6, '#ffe070', '#fff');
+        gr = q.createRadialGradient(FIRE.x, FIRE.y, 0, FIRE.x, FIRE.y, 260); gr.addColorStop(0, 'rgba(255,170,80,0.28)'); gr.addColorStop(0.5, 'rgba(40,30,60,0.2)'); gr.addColorStop(1, 'rgba(10,10,30,0.72)'); q.fillStyle = gr; q.fillRect(0, 0, W, H);
+        g.drawImage(c, 0, 0);
+        // shallow lens: the near and far edges of the table go soft
+        g.filter = 'blur(3.5px)'; g.drawImage(c, 0, 0, W, 74, 0, 0, W, 74); g.drawImage(c, 0, H - 64, W, 64, 0, H - 64, W, 64);
+        g.filter = 'blur(1.6px)'; g.drawImage(c, 0, 74, W, 22, 0, 74, W, 22); g.drawImage(c, 0, H - 86, W, 22, 0, H - 86, W, 22); g.filter = 'none';
+        vignette(g, 0.5);
+      } },
+    { name: 'Bleeding watercolour', pitch: 'A cold dawn on rough paper. Pale washes, pencil lines that wander, and zombies painted as wet stains that bleed into the page. Blood is the only saturated pigment, and it runs.',
+      build: 'Sprites painted as soft washes with a multiply blend; a paper texture and pencil outline pass.', cost: 'Medium. Blood and decals suit it well (stains are what watercolour does best).', risk: 'A daylight look: nights would need to stay pale, with fog instead of darkness.',
+      draw(g) {
+        const r = rng(101);
+        g.fillStyle = '#e9e2d0'; g.fillRect(0, 0, W, H);
+        g.globalCompositeOperation = 'multiply';
+        const wash = (x, y, s, col, n, k0) => { const A = k0 || 1; for (let k = 0; k < (n || 6); k++) { const gx = x + (r() - 0.5) * s * 0.7, gy = y + (r() - 0.5) * s * 0.7, rr = s * (0.5 + r() * 0.6), gd = g.createRadialGradient(gx, gy, rr * 0.3, gx, gy, rr); gd.addColorStop(0, `rgba(${col},${0.16 * A})`); gd.addColorStop(0.85, `rgba(${col},${0.22 * A})`); gd.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gd; g.beginPath(); g.arc(gx, gy, rr, 0, TAU); g.fill(); } };
+        for (let i = 0; i < 34; i++) wash(r() * W, r() * H, 60 + r() * 60, ['120,140,96', '150,150,110', '110,128,120', '160,140,110'][(r() * 4) | 0], 2, 0.4);
+        wash(FIRE.x, FIRE.y, 120, '170,130,90', 6, 0.5);
+        for (let i = 0; i < 16; i++) wash(r() * W, r() < 0.5 ? r() * 40 : H - r() * 40, 70, '60,80,90', 2, 0.5);
+        for (const [x, y] of WALLS) wash(x + 16, y + 16, 20, '90,100,120', 5);
+        for (const [x, y, a, s] of ZS) { wash(x, y, s * 2.1, s > 14 ? '80,50,90' : '70,86,80', 8); wash(x - Math.cos(a) * s * 1.4, y - Math.sin(a) * s * 1.4 + 6, s * 1.4, '70,86,80', 3); }
+        for (const [x, y, s] of BLOOD) { wash(x, y, s * 2.2, '190,20,24', 9); for (let k = 0; k < 3; k++) { const dx = (r() - 0.5) * s; g.fillStyle = 'rgba(190,20,24,0.3)'; g.fillRect(x + dx, y, 1.6, 14 + r() * 26); } }
+        wash(ME.x, ME.y, 20, '200,60,50', 6); wash(FIRE.x, FIRE.y - 6, 22, '240,130,30', 8); wash(FIRE.x, FIRE.y - 8, 10, '250,200,60', 5); wash(TURRET.x, TURRET.y, 20, '90,100,120', 5);
+        g.globalCompositeOperation = 'source-over';
+        const pencil = (fn) => { g.strokeStyle = 'rgba(40,36,34,0.75)'; g.lineWidth = 0.9; for (let k = 0; k < 2; k++) { g.save(); g.translate((r() - 0.5) * 1.6, (r() - 0.5) * 1.6); fn(); g.stroke(); g.restore(); } };
+        for (const [x, y] of WALLS) pencil(() => { g.beginPath(); g.rect(x + 2, y + 2, T - 4, T - 4); g.moveTo(x + 4, y + 12); g.lineTo(x + T - 4, y + 11); g.moveTo(x + 4, y + 22); g.lineTo(x + T - 4, y + 23); });
+        for (const [x, y, a, s] of ZS) at(g, x, y, a, () => { pencil(() => torso(g, s)); pencil(() => head(g, s)); pencil(() => arms(g, s, 1.4)); g.fillStyle = 'rgba(30,26,24,0.9)'; g.beginPath(); g.arc(s * 0.72, -s * 0.2, 1.4, 0, TAU); g.arc(s * 0.72, s * 0.2, 1.4, 0, TAU); g.fill(); });
+        at(g, ME.x, ME.y, ME.a, () => { pencil(() => torso(g, 10)); pencil(() => head(g, 9)); pencil(() => { g.beginPath(); g.rect(6, 2, 22, 4); }); });
+        at(g, TURRET.x, TURRET.y, TURRET.a, () => pencil(() => { g.beginPath(); g.arc(0, 0, 10, 0, TAU); g.rect(8, -2.5, 16, 5); }));
+        pencil(() => { g.beginPath(); g.moveTo(FIRE.x - 12, FIRE.y + 6); g.quadraticCurveTo(FIRE.x - 14, FIRE.y - 10, FIRE.x, FIRE.y - 26); g.quadraticCurveTo(FIRE.x + 14, FIRE.y - 8, FIRE.x + 12, FIRE.y + 6); });
+        g.strokeStyle = 'rgba(40,36,34,0.6)'; g.lineWidth = 1; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(ME.x + 26, ME.y + 13); g.lineTo(SHOT.x, SHOT.y); g.stroke(); g.setLineDash([]);
+        for (let i = 0; i < 6000; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '90,80,60' : '255,255,255'},${r() * 0.1})`; g.fillRect(r() * W, r() * H, 1.3, 1.3); }
+        const v = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.62); v.addColorStop(0, 'rgba(233,226,208,0)'); v.addColorStop(1, 'rgba(233,226,208,0.85)'); g.fillStyle = v; g.fillRect(0, 0, W, H);
+      } },
+  ];
+
+  const grid = document.getElementById('grid');
+  STYLES.forEach((s, i) => {
+    const art = document.createElement('article'), cv = mk(W, H);
+    const txt = document.createElement('div'); txt.className = 'txt';
+    const h2 = document.createElement('h2'), n = document.createElement('span'); n.textContent = String(i + 1).padStart(2, '0'); h2.appendChild(n); h2.appendChild(document.createTextNode(s.name));
+    const p = document.createElement('p'); p.textContent = s.pitch;
+    const dl = document.createElement('dl');
+    for (const [k, v] of [['Built by', s.build], ['Cost', s.cost], ['Watch out', s.risk]]) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.appendChild(dt); dl.appendChild(dd); }
+    txt.appendChild(h2); txt.appendChild(p); txt.appendChild(dl); art.appendChild(cv); art.appendChild(txt); grid.appendChild(art);
+    const g = cv.getContext('2d');
+    try { s.draw(g); } catch (e) { g.fillStyle = '#fff'; g.font = '14px sans-serif'; g.fillText('Could not draw: ' + e.message, 20, 40); console.error(s.name, e); }
+  });
+})();
+</script>
+</body>
+</html>

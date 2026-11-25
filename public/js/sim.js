@@ -381,7 +381,11 @@
     // Late game ramps harder: by then a camp has a ring of turrets, so from night 10 every night adds extra health
     // and a bigger horde on top of the base curve (night 17: 1.6x health and 1.2x zombies over the base; night 25: 2.8x and 1.45x).
     lateRamp(n) { const k = Math.max(0, n - 10); return { hp: 1 + 0.06 * k + 0.004 * k * k, count: 1 + 0.03 * k }; }
-    hpMul(n) { return (1 + 0.12 * (n - 1) + 0.006 * (n - 1) * (n - 1)) * this.lateRamp(n).hp; }    // n10 2.6x, n15 5.4x, n17 7.2x, n20 10.9x, n25 20.5x
+    // Mid game: the night-5 supply drop used to outrun nights 6-9, so the horde steps up right after the first boss and
+    // keeps climbing to night 10, then holds (so night 10 is still a jump and later nights carry the same extra).
+    // zombies: n6 1.12x, n7 1.16x, n8 1.20x, n9 1.24x, n10+ 1.25x.  health: n6 1.045x ... n9+ 1.12x.
+    midRamp(n) { const k = n - 5; return k <= 0 ? { hp: 1, count: 1 } : { hp: Math.min(1.12, 1.02 + 0.025 * k), count: Math.min(1.25, 1.08 + 0.04 * k) }; }
+    hpMul(n) { return (1 + 0.12 * (n - 1) + 0.006 * (n - 1) * (n - 1)) * this.midRamp(n).hp * this.lateRamp(n).hp; }    // n6 1.8x, n9 2.6x, n10 2.9x, n15 6.0x, n17 8.1x, n20 12.2x, n25 23x
     biteMul(n) { return 1 + 0.05 * (n - 1); }                              // damage to survivors
     wallMul(n) { return 1.2 * (1 + 0.08 * (n - 1)); }                       // damage to structures
     isBloodMoon(n) { return n >= 8 && n % 4 === 0; }
@@ -421,7 +425,7 @@
       const pc = Math.max(1, this.active().length);
       const blood = this.isBloodMoon(n);
       const early = n === 1 ? 0.7 : n === 2 ? 0.8 : n === 3 ? 0.9 : 1;   // quicker opening nights
-      let budget = (14 + 8 * n + 0.9 * n * n) * d.count * (0.5 + 0.5 * pc) * (blood ? 1.35 : 1) * early * this.lateRamp(n).count;
+      let budget = (14 + 8 * n + 0.9 * n * n) * d.count * (0.5 + 0.5 * pc) * (blood ? 1.35 : 1) * early * this.midRamp(n).count * this.lateRamp(n).count;
       const weights = this.spawnWeights(n);
       const types = Object.keys(weights).filter((t) => GD.ZOMBIES[t].from <= n);
       if (this.forecast && weights[this.forecast.featured]) weights[this.forecast.featured] *= 3;

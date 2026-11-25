@@ -57,6 +57,29 @@ window into it. README.md is the player-facing reference (controls, enemies, gea
 - Art goal: gritty, not cartoony. Blood comes from the dark `BLOOD`/`BILE` palettes via `goreCol`, irregular `blot`/
   `drop` shapes, directional exit spray, creeping pools, drying. Zombies use pre-rendered rot/volume sprites.
   Gore setting: Full / Reduced / Off (`R.gore`). Verify visual work with screenshots.
+- Graphics styles are per device (`R.style`, `le_style` in localStorage, list in `Renderer.STYLES`, switched with
+  `R.setStyle`; Classic must stay untouched). Each style has its own file `public/js/look-<id>.js` registering
+  `Renderer.LOOKS[id]` with its own drawing: `zombie`, `player`, `sprite`, `struct`, `under`, `over`, `flames`
+  (render.js calls them through `this.lk`). The owner rejected a first Charcoal that was only a grey filter over
+  Classic art: a style must have its own hand-made art and match its concept in `docs/style-concepts*.png`; review
+  each with screenshots against the concept. Charcoal also uses a CSS greyscale filter on the main canvas (fallback
+  for builds without bespoke art), a stroke sheet `R.paper` above the darkness, and draws colour (flames, flying
+  blood, tracers) on the fx layer. Woodcut (`look-woodcut.js`) is done the same way (it reuses `R.SHAPES` from the
+  charcoal file, so load order matters). Watercolour (`look-watercolour.js`) blends the world layer onto the paper
+  with CSS multiply and turns night into a pale fog (`paleNight`). A look also themes the menus (`public/looks.css`,
+  keyed off `<html data-look>`), the HUD fonts (`hudFont`/`titleFont`) and, via `STYLES[].sound`, music and gun sounds
+  (`Renderer.setTheme`). Settings live in the shared Graphics panel (`js/gfxmenu.js`, thumbnails in `public/img/`).
+  The owner wants every new look to bring matching menus and sound. Stained glass (`look-glass.js`, style id `glass`) is done. Cross-stitch (`look-stitch.js`, id `stitch`) lays a linen sheet with X-shaped holes
+  over the world (`lk.overlay` -> `R.lkLayer`) and draws kill threads onto it (`lk.event`, cleared by `lk.reset`). Queued, one at a time with his sign-off: 
+  (none left: Shadow puppet theatre is `look-puppet.js`, id `puppet`; A child drew this is `look-kid.js`, id `kid`,
+  which repaints the ground each dawn from `R.kidNight`). All seven looks he asked for are in.
+- Blood is per look: `lk.splat(R, decalsCtx, x, y, r, bile, alpha, ang)` replaces the classic ground blood for that look
+  (and switches off classic pools and landing drops); `lk.tick` runs each frame (watercolour drips). The owner singled
+  out the cross-stitch threads as the model: gore should be made of the look's own medium (smears, cut wedges,
+  running washes, glass shards, stitches, torn cloth, crayon scribble), not recoloured classic splats.
+  The same goes for what flies off (`lk.fleck`, which also replaces classic gib chunks), the dead left on the ground
+  (`lk.body`), and effect rings / lightning (`fxInk`, `fxDash`, `fxOver`). He asked for this to go further than
+  realism: in the child's drawing, kills are comic POW bursts and flying doodles, not blood.
 - Work token-frugally: no broad rereads, no speculative systems.
 
 ## Headless screenshots (the Chrome extension is usually not connected)

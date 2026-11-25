@@ -400,12 +400,13 @@
   function refreshAudioBtns() {
     $('aMusic').textContent = 'Music: ' + (AudioFX.isMusicOn() ? 'ON' : 'OFF');
     $('aMute').textContent = 'Sound: ' + (AudioFX.isMuted() ? 'OFF' : 'ON');
-    $('aGore').textContent = 'Gore: ' + ['Off', 'Reduced', 'Full'][R.gore];
-    $('aSharp').textContent = 'Graphics: ' + (R.sharp ? 'Always sharp' : 'Auto (smooth)');
   }
   R.sharp = store.get('le_sharp') === '1';
-  $('aGore').onclick = () => { R.gore = (R.gore + 2) % 3; store.set('le_gore', String(R.gore)); refreshAudioBtns(); };
-  $('aSharp').onclick = () => { R.sharp = !R.sharp; store.set('le_sharp', R.sharp ? '1' : '0'); refreshAudioBtns(); };
+  // Graphics panel: look, gore, sharpness (this screen only)
+  const gfx = window.GfxMenu.build($('gfxBody'), () => R, () => $('gfxPanel').classList.remove('show'));
+  const openGfx = () => { gfx.refresh(); $('gfxPanel').classList.add('show'); };
+  $('gfxBtn').onclick = openGfx; $('pGfxBtn').onclick = openGfx;
+  $('gfxPanel').addEventListener('mousedown', (e) => { if (e.target === $('gfxPanel')) $('gfxPanel').classList.remove('show'); });
 
   // ---- sound style pickers (this device): click a gun style to hear a volley, a music style to hear its night
   function buildStylePickers(gunBox, musBox, descEl, btnCls) {

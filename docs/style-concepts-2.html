@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Ember: twenty stranger looks</title>
+<style>
+  :root { --bg: #0e0f12; --card: #16181d; --line: #2a2e37; --ink: #e9e6df; --dim: #9aa0aa; --hot: #ffb54a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { max-width: 1400px; margin: 0 auto; padding: 28px 16px 8px; }
+  h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 0.02em; }
+  header p { margin: 0; color: var(--dim); max-width: 78ch; }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+  article { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+  canvas { width: 100%; height: auto; display: block; background: #000; }
+  .txt { padding: 12px 14px 14px; }
+  h2 { margin: 0 0 4px; font-size: 18px; }
+  h2 span { color: var(--hot); margin-right: 8px; font-variant-numeric: tabular-nums; }
+  .txt p { margin: 0 0 8px; color: #cfd3da; }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
+  dt { color: var(--dim); } dd { margin: 0; color: #d9dce2; }
+  footer { max-width: 1400px; margin: 0 auto; padding: 4px 16px 40px; color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Last Ember: twenty stranger looks</h1>
+  <p>Round two, further out. The same camp scene again, but each of these changes what seeing means in the game, not only the paint. Rough thumbnails to react to; each card names the twist it would bring to play.</p>
+</header>
+<main id="grid"></main>
+<footer>Every picture on this page is drawn live in your browser from one shared scene description.</footer>
+<script>
+(function () {
+  'use strict';
+  const W = 640, H = 360, T = 32, TAU = Math.PI * 2;
+  const FIRE = { x: 310, y: 184 }, WALLS = [];
+  for (let x = 192; x <= 416; x += T) WALLS.push([x, 96]);
+  for (let y = 128; y <= 224; y += T) WALLS.push([192, y]);
+  WALLS.push([416, 128], [416, 160]);
+  const TUR = { x: 368, y: 144, a: -0.5 }, ME = { x: 352, y: 214, a: 0.42 }, SHOT = { x: 452, y: 258 };
+  const ZS = [[520, 262, 3.35, 11], [566, 150, 3.0, 11], [92, 196, 0.1, 11], [132, 300, -0.45, 11], [300, 332, -1.5, 10], [596, 318, 3.6, 11], [70, 84, 0.55, 17]];
+  const BLOOD = [[486, 250, 16], [150, 284, 12]];
+  function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const at = (g, x, y, a, fn) => { g.save(); g.translate(x, y); g.rotate(a); fn(); g.restore(); };
+  const circ = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, TAU); };
+  // a creature facing +x: torso, head, two reaching arms
+  function body(g, s, fill, line, lw) {
+    g.lineCap = 'round'; g.lineWidth = lw || s * 0.32; g.strokeStyle = line || fill;
+    g.beginPath(); g.moveTo(0, -s * 0.8); g.lineTo(s * 1.35, -s * 0.5); g.moveTo(0, s * 0.8); g.lineTo(s * 1.1, s * 0.38); g.stroke();
+    g.fillStyle = fill; g.beginPath(); g.ellipse(0, 0, s * 0.72, s, 0, 0, TAU); g.fill(); if (line) { g.lineWidth = lw; g.stroke(); }
+    circ(g, s * 0.5, 0, s * 0.52); g.fill(); if (line) g.stroke();
+  }
+  const zs = (g, fn) => { for (const [x, y, a, s] of ZS) at(g, x, y, a, () => fn(s, x, y, a)); };
+  const walls = (g, fn) => { for (const [x, y] of WALLS) fn(x, y); };
+  const rad = (g, x, y, r, stops) => { const q = g.createRadialGradient(x, y, 0, x, y, r); stops.forEach(([o, c]) => q.addColorStop(o, c)); g.fillStyle = q; g.fillRect(x - r, y - r, r * 2, r * 2); };
+  const noise = (g, n, a, seed, cols) => { const r = rng(seed); for (let i = 0; i < n; i++) { g.fillStyle = `rgba(${cols[(r() * cols.length) | 0]},${a * r()})`; g.fillRect(r() * W, r() * H, 1.5, 1.5); } };
+  const vig = (g, a, col) => rad(g, W / 2, H / 2, W * 0.62, [[0.45, `rgba(${col || '0,0,0'},0)`], [1, `rgba(${col || '0,0,0'},${a})`]]);
+  const tracer = (g, col, lw) => { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); g.moveTo(ME.x + 24, ME.y + 12); g.lineTo(SHOT.x, SHOT.y); g.stroke(); };
+  // a plain flat version of the scene, for the styles that process a whole picture
+  function flat(g, P) {
+    g.fillStyle = P.bg; g.fillRect(0, 0, W, H); rad(g, FIRE.x, FIRE.y, 170, [[0, P.lit], [1, 'rgba(0,0,0,0)']]);
+    walls(g, (x, y) => { g.fillStyle = P.wall; g.fillRect(x + 1, y + 1, T - 2, T - 2); });
+    for (const [x, y, s] of BLOOD) { g.fillStyle = P.blood; circ(g, x, y, s); g.fill(); }
+    zs(g, (s) => body(g, s, s > 14 ? P.brute : P.z)); at(g, ME.x, ME.y, ME.a, () => { body(g, 10, P.me); g.fillStyle = P.gun; g.fillRect(6, 2, 22, 4); });
+    g.fillStyle = P.wall; circ(g, TUR.x, TUR.y, 10); g.fill(); g.fillStyle = P.fire; circ(g, FIRE.x, FIRE.y, 13); g.fill(); tracer(g, P.fire, 2);
+  }
+  const L = [];
+  const S = (name, pitch, twist, draw) => L.push({ name, pitch, twist, draw });
+
+  S('Thermal camera', 'Heat is all you see. The living and the fire burn white and yellow; the dead are cold, a slightly darker blue than the ground.', 'Zombies are nearly invisible until they feed, burn or get shot. Fire becomes your radar.', (g, r) => {
+    g.fillStyle = '#1a0f3c'; g.fillRect(0, 0, W, H); noise(g, 5000, 0.3, 1, ['40,20,90', '10,6,40']);
+    rad(g, FIRE.x, FIRE.y, 190, [[0, '#fff'], [0.12, '#fff36a'], [0.3, '#ff7a1a'], [0.55, 'rgba(200,30,90,0.7)'], [1, 'rgba(60,20,120,0)']]);
+    walls(g, (x, y) => { g.fillStyle = Math.hypot(x - FIRE.x, y - FIRE.y) < 150 ? '#b0306a' : '#4a2a8a'; g.fillRect(x + 1, y + 1, T - 2, T - 2); });
+    zs(g, (s) => body(g, s, '#0c0a30', '#2a3c9a', 1));
+    for (const [x, y, s] of BLOOD) rad(g, x, y, s * 1.6, [[0, '#ff9a2a'], [0.5, '#c0306a'], [1, 'rgba(90,30,140,0)']]);
+    rad(g, ME.x, ME.y, 30, [[0, '#fff'], [0.35, '#ffe45a'], [0.7, '#ff5a1a'], [1, 'rgba(200,30,90,0)']]); rad(g, TUR.x + 14, TUR.y - 8, 16, [[0, '#ffd24a'], [1, 'rgba(255,90,20,0)']]); tracer(g, '#fff', 2);
+    const b = g.createLinearGradient(0, 60, 0, 300); [['#fff', 0], ['#ffe45a', 0.2], ['#ff5a1a', 0.45], ['#b0306a', 0.7], ['#1a0f3c', 1]].forEach(([c, o]) => b.addColorStop(o, c)); g.fillStyle = b; g.fillRect(W - 26, 60, 10, 240);
+    g.fillStyle = '#fff'; g.font = '11px monospace'; g.fillText('38°', W - 50, 68); g.fillText('4°', W - 44, 300);
+  });
+  S('X-ray plate', 'Radiograph film. Flesh is a blue haze, bone and steel are white. You see what is inside everything: the skeleton in the horde, the rounds in a turret.', 'Enemy health reads as broken bones; ammo is visible inside guns; hidden things show through walls.', (g, r) => {
+    const q = g.createLinearGradient(0, 0, W, H); q.addColorStop(0, '#04121c'); q.addColorStop(1, '#0a2436'); g.fillStyle = q; g.fillRect(0, 0, W, H);
+    walls(g, (x, y) => { g.fillStyle = 'rgba(150,200,230,0.22)'; g.fillRect(x + 1, y + 1, T - 2, T - 2); g.strokeStyle = 'rgba(235,245,255,0.8)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x + 8, y + 2); g.lineTo(x + 8, y + T - 2); g.moveTo(x + 24, y + 2); g.lineTo(x + 24, y + T - 2); g.stroke(); });
+    const bones = (s, gun) => { body(g, s, 'rgba(140,200,235,0.2)'); g.strokeStyle = '#eef6ff'; g.lineWidth = 1.5; g.shadowColor = '#bfe4ff'; g.shadowBlur = 5; g.beginPath(); g.moveTo(-s * 0.7, 0); g.lineTo(s * 0.2, 0); for (let k = -2; k <= 2; k++) { g.moveTo(k * s * 0.22 - s * 0.2, -s * 0.7); g.quadraticCurveTo(k * s * 0.22, 0, k * s * 0.22 - s * 0.2, s * 0.7); } g.moveTo(0, -s * 0.8); g.lineTo(s * 0.7, -s * 0.65); g.lineTo(s * 1.35, -s * 0.5); g.moveTo(0, s * 0.8); g.lineTo(s * 0.6, s * 0.6); g.lineTo(s * 1.1, s * 0.38); g.stroke(); circ(g, s * 0.5, 0, s * 0.42); g.stroke(); g.fillStyle = '#04121c'; circ(g, s * 0.68, -s * 0.16, s * 0.1); g.fill(); circ(g, s * 0.68, s * 0.16, s * 0.1); g.fill(); if (gun) { g.fillStyle = '#fff'; g.fillRect(6, 2, 24, 4); for (let k = 0; k < 5; k++) g.fillRect(9 + k * 3, 7, 2, 4); } g.shadowBlur = 0; };
+    zs(g, (s) => bones(s)); at(g, ME.x, ME.y, ME.a, () => bones(10, true));
+    g.fillStyle = '#fff'; circ(g, TUR.x, TUR.y, 4); g.fill(); g.strokeStyle = '#eef6ff'; circ(g, TUR.x, TUR.y, 10); g.stroke(); rad(g, FIRE.x, FIRE.y, 40, [[0, 'rgba(200,230,255,0.5)'], [1, 'rgba(200,230,255,0)']]);
+    noise(g, 6000, 0.12, 2, ['255,255,255', '0,0,0']); vig(g, 0.7); g.fillStyle = 'rgba(220,240,255,0.7)'; g.font = '11px monospace'; g.fillText('L   CAMP 7   NIGHT 12', 18, H - 14);
+  });
+  S('Stained glass', 'A cathedral window telling the story of the camp. Thick lead lines, jewel colours, and the campfire is the sun behind the glass.', 'Damage cracks the panes. A lost run ends with the window shattering.', (g, r) => {
+    const N = 16, M = 9, pt = []; for (let j = 0; j <= M; j++) for (let i = 0; i <= N; i++) pt.push([i * W / N + (i % N ? (r() - 0.5) * 26 : 0), j * H / M + (j % M ? (r() - 0.5) * 24 : 0)]);
+    g.lineJoin = 'round';
+    for (let j = 0; j < M; j++) for (let i = 0; i < N; i++) { const a = pt[j * (N + 1) + i], b = pt[j * (N + 1) + i + 1], c = pt[(j + 1) * (N + 1) + i + 1], d = pt[(j + 1) * (N + 1) + i], k = Math.max(0, 1 - Math.hypot((a[0] + c[0]) / 2 - FIRE.x, (a[1] + c[1]) / 2 - FIRE.y) / 230), v = r(); g.fillStyle = k > 0.25 ? `hsl(${28 + v * 22},90%,${22 + k * 48}%)` : `hsl(${210 + v * 50},70%,${10 + v * 16}%)`; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill(); g.strokeStyle = '#08080a'; g.lineWidth = 3; g.stroke(); }
+    walls(g, (x, y) => { g.fillStyle = '#8fa6b8'; g.fillRect(x, y, T, T); g.strokeStyle = '#08080a'; g.lineWidth = 3; g.strokeRect(x, y, T, T); });
+    zs(g, (s) => { body(g, s, s > 14 ? '#7a2a8a' : '#3f8a4a', '#08080a', 2.6); g.fillStyle = '#ffe26a'; circ(g, s * 0.7, -s * 0.2, 1.6); g.fill(); circ(g, s * 0.7, s * 0.2, 1.6); g.fill(); });
+    for (const [x, y, s] of BLOOD) { g.fillStyle = '#c0181c'; circ(g, x, y, s); g.fill(); g.strokeStyle = '#08080a'; g.lineWidth = 3; g.stroke(); }
+    at(g, ME.x, ME.y, ME.a, () => body(g, 10, '#e8e2c8', '#08080a', 2.6));
+    g.fillStyle = '#fff3b0'; g.beginPath(); for (let i = 0; i <= 16; i++) { const a = i / 16 * TAU, d = i % 2 ? 12 : 26; g.lineTo(FIRE.x + Math.cos(a) * d, FIRE.y + Math.sin(a) * d); } g.fill(); g.strokeStyle = '#08080a'; g.lineWidth = 3; g.stroke();
+    g.globalCompositeOperation = 'lighter'; rad(g, FIRE.x, FIRE.y, 260, [[0, 'rgba(255,200,120,0.35)'], [1, 'rgba(255,200,120,0)']]); g.globalCompositeOperation = 'source-over';
+  });
+  S('Cross-stitch sampler', 'The whole game embroidered on linen: every pixel an X of thread, a stitched border, and blood as red thread coming unpicked.', 'Kills leave stitches; the map slowly becomes a sampler recording the whole run.', (g, r) => {
+    const c = mk(W, H), q = c.getContext('2d'); flat(q, { bg: '#3d5a40', lit: 'rgba(214,170,90,0.9)', wall: '#8a8f98', blood: '#b01018', brute: '#6a3a7a', z: '#9fbf6a', me: '#d0483c', gun: '#222', fire: '#ffb020' });
+    const n = 8, sm = mk(W / n, H / n), sq = sm.getContext('2d'); sq.drawImage(c, 0, 0, W / n, H / n); const d = sq.getImageData(0, 0, W / n, H / n).data;
+    g.fillStyle = '#d8ceb4'; g.fillRect(0, 0, W, H); g.strokeStyle = 'rgba(120,105,80,0.25)'; g.lineWidth = 1; g.beginPath(); for (let x = 0; x < W; x += 4) { g.moveTo(x, 0); g.lineTo(x, H); } for (let y = 0; y < H; y += 4) { g.moveTo(0, y); g.lineTo(W, y); } g.stroke();
+    g.lineCap = 'round'; g.lineWidth = 2.2;
+    for (let y = 1; y < H / n - 1; y++) for (let x = 1; x < W / n - 1; x++) { const i = (y * (W / n) + x) * 4; g.strokeStyle = `rgb(${d[i]},${d[i + 1]},${d[i + 2]})`; g.beginPath(); g.moveTo(x * n + 1, y * n + 1); g.lineTo(x * n + 7, y * n + 7); g.moveTo(x * n + 7, y * n + 1); g.lineTo(x * n + 1, y * n + 7); g.stroke(); }
+    g.strokeStyle = '#b01018'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(486, 256); g.bezierCurveTo(500, 300, 470, 320, 510, 352); g.stroke();
+  });
+  S('Text terminal', 'No pictures at all. The camp is typed characters on an amber tube: # walls, Z the dead, @ you. Light decides which characters are drawn.', 'Unseen zombies are simply not printed. Reading the screen is the skill.', (g, r) => {
+    g.fillStyle = '#0a0703'; g.fillRect(0, 0, W, H); g.font = 'bold 14px monospace'; g.textBaseline = 'top';
+    const cw = 10, ch = 15, cell = {}; const put = (x, y, c, col) => { cell[Math.floor(x / cw) + ',' + Math.floor(y / ch)] = [c, col]; };
+    walls(g, (x, y) => { for (let k = 0; k < 3; k++) for (let j = 0; j < 2; j++) put(x + k * cw + 2, y + j * ch + 2, '#', '#ffc86a'); });
+    for (const [x, y, s] of BLOOD) for (let k = 0; k < 6; k++) put(x + (r() - 0.5) * s * 3, y + (r() - 0.5) * s * 2, '%', '#ff4030');
+    for (const [x, y, a, s] of ZS) put(x, y, s > 14 ? 'B' : 'Z', s > 14 ? '#ff7a3a' : '#b8ff6a'); put(ME.x, ME.y, '@', '#fff'); put(TUR.x, TUR.y, 'T', '#8fd0ff'); put(FIRE.x, FIRE.y, '*', '#ffe070');
+    for (let k = 1; k < 9; k++) put(ME.x + 24 + k * 10, ME.y + 12 + k * 4.6, '-', '#fff');
+    for (let y = 0; y < H / ch; y++) for (let x = 0; x < W / cw; x++) { const c = cell[x + ',' + y], lit = Math.max(0, 1 - Math.hypot(x * cw - FIRE.x, y * ch - FIRE.y) / 200); g.fillStyle = c ? c[1] : `rgba(255,176,64,${0.08 + lit * 0.5})`; g.fillText(c ? c[0] : (r() < 0.2 ? ',' : '.'), x * cw, y * ch); }
+    g.fillStyle = 'rgba(0,0,0,0.28)'; for (let y = 0; y < H; y += 3) g.fillRect(0, y, W, 1); vig(g, 0.7);
+  });
+  S('Architect blueprint', 'Your fort as a working drawing: white linework on blue, dimensions, section marks. The dead are scrawled on it in red pen by someone in a hurry.', 'The plan is honest about your build: weak points, firing arcs and gaps are annotated for you.', (g, r) => {
+    g.fillStyle = '#123e7a'; g.fillRect(0, 0, W, H); g.strokeStyle = 'rgba(255,255,255,0.1)'; g.lineWidth = 1; g.beginPath(); for (let x = 0; x < W; x += 16) { g.moveTo(x, 0); g.lineTo(x, H); } for (let y = 8; y < H; y += 16) { g.moveTo(0, y); g.lineTo(W, y); } g.stroke();
+    g.strokeStyle = '#eaf2ff'; g.fillStyle = '#eaf2ff'; g.font = '10px monospace';
+    walls(g, (x, y) => { g.lineWidth = 1.4; g.strokeRect(x + 2, y + 2, T - 4, T - 4); g.lineWidth = 0.6; g.beginPath(); for (let k = 0; k < 4; k++) { g.moveTo(x + 2 + k * 8, y + T - 2); g.lineTo(x + 10 + k * 8, y + 2); } g.stroke(); });
+    g.lineWidth = 0.8; g.beginPath(); g.moveTo(192, 78); g.lineTo(448, 78); g.moveTo(192, 72); g.lineTo(192, 84); g.moveTo(448, 72); g.lineTo(448, 84); g.stroke(); g.fillText('8 x STEEL  10.2 m', 268, 72);
+    circ(g, FIRE.x, FIRE.y, 14); g.stroke(); g.fillText('FIRE', FIRE.x - 12, FIRE.y + 30); g.setLineDash([5, 4]); circ(g, TUR.x, TUR.y, 96); g.stroke(); g.setLineDash([]); circ(g, TUR.x, TUR.y, 8); g.stroke(); g.fillText('T1 r=340', TUR.x + 14, TUR.y - 14);
+    at(g, ME.x, ME.y, ME.a, () => { g.lineWidth = 1.2; g.strokeRect(-7, -9, 14, 18); g.beginPath(); g.moveTo(7, 3); g.lineTo(28, 3); g.stroke(); });
+    g.strokeStyle = '#ff5040'; g.fillStyle = '#ff5040'; g.lineWidth = 1.6; g.font = 'italic 13px cursive';
+    zs(g, (s) => { g.beginPath(); for (let k = 0; k < 26; k++) { const a = k * 0.7, d = s * (0.5 + 0.5 * r()); g.lineTo(Math.cos(a) * d, Math.sin(a) * d); } g.stroke(); });
+    g.beginPath(); g.moveTo(500, 250); g.lineTo(440, 206); g.lineTo(450, 218); g.moveTo(440, 206); g.lineTo(454, 207); g.stroke(); g.fillText('GAP!! they get in here', 458, 214); g.fillText('7 of them. more coming', 40, 250);
+  });
+  S('A child drew this', 'Wax crayon on lined paper, drawn by the youngest survivor. Stick people, a scribbled sun crossed out in black, and things she should not have had to draw.', 'The drawings get darker and more frantic as the nights go on. The art is the story.', (g, r) => {
+    g.fillStyle = '#f4f0e4'; g.fillRect(0, 0, W, H); g.strokeStyle = 'rgba(90,140,200,0.4)'; g.lineWidth = 1; g.beginPath(); for (let y = 20; y < H; y += 20) { g.moveTo(0, y); g.lineTo(W, y); } g.stroke(); g.strokeStyle = 'rgba(220,80,80,0.5)'; g.beginPath(); g.moveTo(54, 0); g.lineTo(54, H); g.stroke();
+    const wax = (col, lw, fn) => { g.strokeStyle = col; g.lineCap = 'round'; for (let k = 0; k < 3; k++) { g.globalAlpha = 0.55; g.lineWidth = lw * (0.6 + r() * 0.6); g.save(); g.translate((r() - 0.5) * 2.4, (r() - 0.5) * 2.4); g.beginPath(); fn(); g.stroke(); g.restore(); } g.globalAlpha = 1; };
+    const scrib = (x, y, w, h) => { for (let k = 0; k < 10; k++) { g.moveTo(x + r() * w, y + r() * h); g.lineTo(x + r() * w, y + r() * h); } };
+    wax('#3f8a3a', 5, () => scrib(60, 330, 560, 26)); walls(g, (x, y) => wax('#7a5a34', 3.5, () => { g.rect(x + 3, y + 3, T - 6, T - 6); g.moveTo(x + 3, y + 3); g.lineTo(x + T - 3, y + T - 3); }));
+    const stick = (x, y, s, col, sad) => wax(col, 3, () => { g.arc(x, y - s * 1.5, s * 0.6, 0, TAU); g.moveTo(x, y - s * 0.9); g.lineTo(x, y + s * 0.5); g.moveTo(x - s, y - s * (sad ? 0.9 : 0.2)); g.lineTo(x + s, y - s * (sad ? 0.9 : 0.2)); g.moveTo(x, y + s * 0.5); g.lineTo(x - s * 0.6, y + s * 1.4); g.moveTo(x, y + s * 0.5); g.lineTo(x + s * 0.6, y + s * 1.4); });
+    for (const [x, y, a, s] of ZS) { stick(x, y, s, s > 14 ? '#5a2a7a' : '#4a8a2a', true); wax('#111', 1.6, () => { g.moveTo(x - 4, y - s * 1.7); g.lineTo(x - 1, y - s * 1.4); g.moveTo(x - 1, y - s * 1.7); g.lineTo(x - 4, y - s * 1.4); g.moveTo(x + 1, y - s * 1.7); g.lineTo(x + 4, y - s * 1.4); g.moveTo(x + 4, y - s * 1.7); g.lineTo(x + 1, y - s * 1.4); }); }
+    stick(ME.x, ME.y, 10, '#2a4aa0'); wax('#111', 3, () => { g.moveTo(ME.x + 10, ME.y - 2); g.lineTo(ME.x + 30, ME.y + 6); });
+    wax('#ff8a1a', 5, () => scrib(FIRE.x - 12, FIRE.y - 22, 24, 28)); wax('#e02020', 4, () => scrib(FIRE.x - 6, FIRE.y - 8, 12, 14)); for (const [x, y, s] of BLOOD) wax('#d01818', 5, () => scrib(x - s, y - s * 0.6, s * 2, s * 1.2));
+    wax('#f2c21a', 5, () => g.arc(584, 46, 22, 0, TAU)); wax('#111', 6, () => scrib(556, 20, 56, 52));
+    g.fillStyle = '#2a4aa0'; g.font = '20px cursive'; g.fillText('me', ME.x - 34, ME.y + 6); g.fillStyle = '#111'; g.fillText('they come at nite', 70, 62);
+  });
+  S('Shadow puppet theatre', 'A lamp behind a cloth screen. Everything is a black cut-out held on a rod: lacework holes in the figures let the light through.', 'Depth is blur: things far from the screen are soft and huge. The horde looms before it arrives.', (g, r) => {
+    rad(g, FIRE.x, FIRE.y, 460, [[0, '#ffe9b0'], [0.25, '#f2a84a'], [0.7, '#9a4a16'], [1, '#2a1206']]); g.fillStyle = '#2a1206'; g.globalCompositeOperation = 'destination-over'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 2600; i++) { g.strokeStyle = `rgba(60,25,5,${r() * 0.12})`; const x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() < 0.5 ? 9 : 0), y + (r() < 0.5 ? 0 : 9)); g.stroke(); }
+    const K = '#120804'; g.strokeStyle = K;
+    const rod = (x, y) => { g.lineWidth = 1.4; g.strokeStyle = 'rgba(18,8,4,0.7)'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (x - W / 2) * 0.12, H); g.stroke(); };
+    walls(g, (x, y) => { g.fillStyle = K; g.fillRect(x, y, T, T); g.fillStyle = '#f2a84a'; for (const [a, b] of [[10, 10], [22, 10], [10, 22], [22, 22]]) { circ(g, x + a, y + b, 2.2); g.fill(); } });
+    for (const [x, y, a, s] of ZS) { rod(x, y); g.save(); g.filter = x < 120 || x > 560 ? 'blur(2.5px)' : 'none'; at(g, x, y, a, () => { const k = x < 120 || x > 560 ? 1.5 : 1; body(g, s * k, K); g.fillStyle = '#ffd98a'; circ(g, s * k * 0.68, -s * k * 0.2, 1.8 * k); g.fill(); circ(g, s * k * 0.68, s * k * 0.2, 1.8 * k); g.fill(); for (let q = -2; q <= 2; q++) { circ(g, -s * k * 0.1, q * s * k * 0.3, 1.2 * k); g.fill(); } }); g.restore(); }
+    rod(ME.x, ME.y); at(g, ME.x, ME.y, ME.a, () => { body(g, 10, K); g.fillRect(6, 2, 24, 4); }); g.fillStyle = K; circ(g, TUR.x, TUR.y, 10); g.fill();
+    g.fillStyle = '#fff6d8'; g.beginPath(); for (let i = 0; i <= 14; i++) { const a = i / 14 * TAU, d = i % 2 ? 7 : 16; g.lineTo(FIRE.x + Math.cos(a) * d, FIRE.y + Math.sin(a) * d); } g.fill(); vig(g, 0.6, '20,8,2');
+  });
+  S('Echo-location', 'You are blind. Sound paints the world: every gunshot and footstep sends out a ring, and things appear only as the ring passes over them.', 'Firing reveals the map, and tells the horde where you are. Silence is safe and blind.', (g, r) => {
+    g.fillStyle = '#020308'; g.fillRect(0, 0, W, H); g.lineCap = 'round';
+    for (let k = 1; k <= 6; k++) { g.strokeStyle = `rgba(90,220,255,${0.5 - k * 0.07})`; g.lineWidth = 1.6 - k * 0.15; circ(g, ME.x, ME.y, k * 52); g.stroke(); }
+    const hit = (x, y) => { const d = Math.hypot(x - ME.x, y - ME.y) % 52; return Math.max(0, 1 - Math.min(d, 52 - d) / 16); };
+    walls(g, (x, y) => { for (let k = 0; k < 16; k++) { const px = x + (k % 4) * 10 + 1, py = y + ((k / 4) | 0) * 10 + 1, a = hit(px, py); if (a > 0.05) { g.fillStyle = `rgba(120,230,255,${a})`; g.fillRect(px, py, 2.4, 2.4); } } g.strokeStyle = 'rgba(90,220,255,0.12)'; g.lineWidth = 1; g.strokeRect(x + 1, y + 1, T - 2, T - 2); });
+    for (const [x, y, a, s] of ZS) { const v = 0.25 + hit(x, y) * 0.75; g.strokeStyle = `rgba(255,70,90,${v})`; g.lineWidth = 1.4; for (let k = 1; k <= 3; k++) { g.globalAlpha = 1 / k; circ(g, x, y, s * 0.6 * k); g.stroke(); } g.globalAlpha = 1; g.setLineDash([2, 5]); g.beginPath(); g.moveTo(x, y); g.lineTo(x - Math.cos(a) * 46, y - Math.sin(a) * 46); g.stroke(); g.setLineDash([]); }
+    g.fillStyle = '#eaffff'; circ(g, ME.x, ME.y, 4); g.fill(); for (let k = 1; k <= 4; k++) { g.strokeStyle = `rgba(255,190,90,${0.5 / k})`; circ(g, FIRE.x, FIRE.y, k * 9); g.stroke(); } tracer(g, 'rgba(255,255,255,0.8)', 1.2);
+  });
+  S('Cave painting', 'The last people, painting the end on rock by torchlight: ochre and charcoal, hand stencils, figures like hunters and beasts.', 'Each night survived adds a panel to the wall. Your run is literally a mural.', (g, r) => {
+    g.fillStyle = '#7a5a3c'; g.fillRect(0, 0, W, H); for (let i = 0; i < 260; i++) { const x = r() * W, y = r() * H, s = 20 + r() * 70; rad(g, x, y, s, [[0, `rgba(${r() < 0.5 ? '160,120,80' : '70,48,30'},0.28)`], [1, 'rgba(0,0,0,0)']]); }
+    g.strokeStyle = 'rgba(40,26,14,0.5)'; g.lineWidth = 1; for (let i = 0; i < 12; i++) { let x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (r() - 0.5) * 60; y += r() * 30; g.lineTo(x, y); } g.stroke(); }
+    const dry = (col, lw, fn) => { g.strokeStyle = col; g.lineCap = 'round'; g.lineWidth = lw; g.setLineDash([lw * 2.2, lw * 0.5, lw * 0.8, lw * 0.4]); g.beginPath(); fn(); g.stroke(); g.setLineDash([]); };
+    walls(g, (x, y) => dry('#2a1a10', 3, () => { g.rect(x + 4, y + 4, T - 8, T - 8); }));
+    for (const [x, y, a, s] of ZS) dry(s > 14 ? '#1c120c' : '#2a1a10', 3.4, () => { g.moveTo(x, y - s); g.lineTo(x, y + s * 0.6); g.moveTo(x - s, y - s * 0.9); g.lineTo(x, y - s * 0.4); g.lineTo(x + s, y - s * 0.9); g.moveTo(x, y + s * 0.6); g.lineTo(x - s * 0.7, y + s * 1.5); g.moveTo(x, y + s * 0.6); g.lineTo(x + s * 0.7, y + s * 1.5); g.arc(x, y - s * 1.4, s * 0.38, 0, TAU); });
+    dry('#a8321a', 3.4, () => { g.moveTo(ME.x, ME.y - 10); g.lineTo(ME.x, ME.y + 8); g.moveTo(ME.x, ME.y + 8); g.lineTo(ME.x - 7, ME.y + 20); g.moveTo(ME.x, ME.y + 8); g.lineTo(ME.x + 7, ME.y + 20); g.moveTo(ME.x, ME.y - 4); g.lineTo(ME.x + 30, ME.y + 8); g.arc(ME.x, ME.y - 15, 4, 0, TAU); });
+    dry('#c8641a', 4, () => { for (let k = 0; k < 40; k++) { const a = k * 0.5, d = 2 + k * 0.55; g.lineTo(FIRE.x + Math.cos(a) * d, FIRE.y + Math.sin(a) * d); } });
+    for (const [x, y] of [[70, 300], [560, 60], [600, 90]]) { g.fillStyle = 'rgba(168,50,26,0.75)'; g.beginPath(); g.ellipse(x, y, 11, 13, 0, 0, TAU); g.fill(); for (let k = -2; k <= 2; k++) g.fillRect(x + k * 5 - 1.5, y - 28 + Math.abs(k) * 3, 3, 18); }
+    for (const [x, y, s] of BLOOD) for (let k = 0; k < 12; k++) { g.fillStyle = 'rgba(168,50,26,0.8)'; circ(g, x + (r() - 0.5) * s * 3, y + (r() - 0.5) * s * 2, 1 + r() * 3); g.fill(); }
+    rad(g, FIRE.x, FIRE.y, 380, [[0, 'rgba(255,180,90,0.22)'], [0.5, 'rgba(0,0,0,0.1)'], [1, 'rgba(8,4,2,0.85)']]);
+  });
+  S('Illuminated manuscript', 'A monk recording the plague year: parchment, gold leaf, flat figures, a decorated border where small horrors creep in from the margins.', 'Zombies literally enter from the page margins. Captions narrate your night in grave Latin.', (g, r) => {
+    g.fillStyle = '#e4d3a8'; g.fillRect(0, 0, W, H); noise(g, 5000, 0.14, 4, ['120,90,40', '255,250,230']);
+    g.strokeStyle = '#b8862a'; g.lineWidth = 6; g.strokeRect(14, 14, W - 28, H - 28); g.strokeStyle = '#7a1a1a'; g.lineWidth = 1.5; g.strokeRect(22, 22, W - 44, H - 44);
+    for (let k = 0; k < 30; k++) { const x = 14 + (k / 30) * (W - 28); g.fillStyle = k % 2 ? '#2a4a8a' : '#7a1a1a'; circ(g, x + 10, 14, 3); g.fill(); circ(g, x + 10, H - 14, 3); g.fill(); }
+    const ol = '#2a1a0c'; walls(g, (x, y) => { g.fillStyle = '#b9b1a0'; g.fillRect(x, y, T, T); g.strokeStyle = ol; g.lineWidth = 1.4; g.strokeRect(x, y, T, T); g.beginPath(); g.moveTo(x, y + 16); g.lineTo(x + T, y + 16); g.moveTo(x + 16, y); g.lineTo(x + 16, y + 16); g.moveTo(x + 8, y + 16); g.lineTo(x + 8, y + T); g.moveTo(x + 24, y + 16); g.lineTo(x + 24, y + T); g.stroke(); });
+    zs(g, (s) => { body(g, s, s > 14 ? '#5a2a6a' : '#5f7a4a', ol, 1.4); g.fillStyle = '#7a1a1a'; circ(g, s * 0.7, -s * 0.2, 1.4); g.fill(); circ(g, s * 0.7, s * 0.2, 1.4); g.fill(); });
+    for (const [x, y, s] of BLOOD) { g.fillStyle = '#9a1414'; for (let k = 0; k < 5; k++) { g.beginPath(); g.ellipse(x + (k - 2) * s * 0.4, y + (k % 2) * 4, 2.4, 5, 0, 0, TAU); g.fill(); } }
+    at(g, ME.x, ME.y, ME.a, () => { body(g, 10, '#2a4a8a', ol, 1.4); g.fillStyle = ol; g.fillRect(6, 2, 22, 3); }); g.strokeStyle = '#d8a83a'; g.lineWidth = 2; circ(g, ME.x, ME.y, 15); g.stroke();
+    g.fillStyle = '#d8a83a'; g.beginPath(); for (let i = 0; i <= 24; i++) { const a = i / 24 * TAU, d = i % 2 ? 10 : 22; g.lineTo(FIRE.x + Math.cos(a) * d, FIRE.y + Math.sin(a) * d); } g.fill(); g.strokeStyle = ol; g.lineWidth = 1.2; g.stroke(); g.fillStyle = '#b8321a'; circ(g, FIRE.x, FIRE.y, 7); g.fill();
+    g.fillStyle = '#7a1a1a'; g.font = 'bold 30px serif'; g.fillText('N', 40, 318); g.fillStyle = ol; g.font = 'italic 15px serif'; g.fillText('octe septima mortui ad ignem venerunt', 64, 318);
+  });
+  S('Specimen plate', 'A naturalist’s engraving. The field is a labelled plate: each creature pinned, numbered and named in neat copperplate, your camp included.', 'The bestiary is the game screen. New enemy types arrive as new figures with their weaknesses written beside them.', (g, r) => {
+    g.fillStyle = '#efe6cf'; g.fillRect(0, 0, W, H); noise(g, 3000, 0.1, 5, ['110,90,50']); const ink = '#2c2418'; g.strokeStyle = ink; g.fillStyle = ink;
+    const hatch = (fn, n, s) => { g.save(); fn(); g.clip(); g.lineWidth = 0.6; g.beginPath(); for (let k = -n; k < n; k++) { g.moveTo(k * 3, -s * 2); g.lineTo(k * 3 + s, s * 2); } g.stroke(); g.restore(); };
+    walls(g, (x, y) => { g.lineWidth = 1; g.strokeRect(x + 2, y + 2, T - 4, T - 4); g.save(); g.translate(x + 16, y + 16); hatch(() => { g.beginPath(); g.rect(-14, 0, 28, 14); }, 12, 16); g.restore(); });
+    const names = ['Mortuus vulgaris', 'M. cursor', 'M. vulgaris', 'M. reptans', 'M. vulgaris', 'M. cursor', 'M. brutus (rare)'];
+    ZS.forEach(([x, y, a, s], i) => { at(g, x, y, a, () => { g.lineWidth = 1; g.beginPath(); g.moveTo(0, -s * 0.8); g.lineTo(s * 1.35, -s * 0.5); g.moveTo(0, s * 0.8); g.lineTo(s * 1.1, s * 0.38); g.stroke(); g.beginPath(); g.ellipse(0, 0, s * 0.72, s, 0, 0, TAU); g.stroke(); hatch(() => { g.beginPath(); g.ellipse(0, 0, s * 0.72, s, 0, 0, TAU); }, 14, s); circ(g, s * 0.5, 0, s * 0.52); g.fillStyle = '#efe6cf'; g.fill(); g.stroke(); g.fillStyle = ink; circ(g, s * 0.7, -s * 0.2, 1.2); g.fill(); }); const lx = x < W / 2 ? x - s - 6 : x + s + 6; g.lineWidth = 0.6; g.beginPath(); g.moveTo(x, y - s); g.lineTo(lx, y - s - 14); g.stroke(); g.font = 'italic 10px serif'; g.textAlign = x < W / 2 ? 'left' : 'right'; g.fillText((i + 1) + '. ' + names[i], x < W / 2 ? Math.max(8, lx - 20) : Math.min(W - 8, lx + 20), y - s - 18); });
+    g.textAlign = 'left'; at(g, ME.x, ME.y, ME.a, () => { g.lineWidth = 1.2; g.beginPath(); g.ellipse(0, 0, 7, 10, 0, 0, TAU); g.stroke(); circ(g, 5, 0, 5); g.stroke(); g.strokeRect(6, 2, 22, 3); });
+    circ(g, FIRE.x, FIRE.y, 12); g.stroke(); for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; g.beginPath(); g.moveTo(FIRE.x + Math.cos(a) * 15, FIRE.y + Math.sin(a) * 15); g.lineTo(FIRE.x + Math.cos(a) * 24, FIRE.y + Math.sin(a) * 24); g.stroke(); }
+    for (const [x, y, s] of BLOOD) { g.fillStyle = '#8a1a14'; circ(g, x, y, s * 0.6); g.fill(); } g.fillStyle = ink; g.font = '12px serif'; g.fillText('PLATE VII.  The Camp on the Seventh Night, drawn from life.', 150, H - 12); g.lineWidth = 1; g.strokeRect(6, 6, W - 12, H - 12);
+  });
+  S('Under the microscope', 'The camp is a culture in a dish. You are a bright cell; the dead are mould colonies spreading filaments across the agar.', 'The horde does not walk, it grows: infection creeps along the ground and around your walls.', (g, r) => {
+    g.fillStyle = '#05070a'; g.fillRect(0, 0, W, H); g.save(); circ(g, W / 2, H / 2, 172); g.clip();
+    rad(g, W / 2, H / 2, 180, [[0, '#e8d890'], [0.7, '#c8b060'], [1, '#8a7a3a']]); for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(255,255,220,${r() * 0.2})`; circ(g, r() * W, r() * H, r() * 3); g.fill(); }
+    for (const [x0, y0] of WALLS) { const x = W / 2 + (x0 + 16 - W / 2) * 0.62, y = H / 2 + (y0 + 16 - 180) * 0.62 - 8; g.fillStyle = 'rgba(180,220,255,0.55)'; g.strokeStyle = 'rgba(240,250,255,0.9)'; g.lineWidth = 1; g.beginPath(); for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + x; g.lineTo(x + Math.cos(a) * 11, y + Math.sin(a) * 11); } g.closePath(); g.fill(); g.stroke(); }
+    for (const [x0, y0, a, s] of ZS) { const x = W / 2 + (x0 - W / 2) * 0.56, y = H / 2 + (y0 - 180) * 0.62; g.strokeStyle = 'rgba(30,50,20,0.6)'; g.lineWidth = 0.8; for (let k = 0; k < 26; k++) { let px = x, py = y, an = r() * TAU; g.beginPath(); g.moveTo(px, py); for (let j = 0; j < 6; j++) { an += (r() - 0.5); px += Math.cos(an) * 6; py += Math.sin(an) * 6; g.lineTo(px, py); } g.stroke(); } rad(g, x, y, s * 1.8, [[0, s > 14 ? '#3a1a3a' : '#1c2a14'], [0.6, 'rgba(60,90,40,0.75)'], [1, 'rgba(90,120,60,0)']]); }
+    const mx = W / 2 + (ME.x - W / 2) * 0.56, my = H / 2 + (ME.y - 180) * 0.62; rad(g, mx, my, 16, [[0, '#fff'], [0.5, 'rgba(255,120,120,0.85)'], [1, 'rgba(255,120,120,0)']]); g.fillStyle = '#b02a3a'; circ(g, mx + 2, my, 4); g.fill();
+    rad(g, W / 2 - 6, H / 2 + 2, 30, [[0, '#fff8c0'], [0.4, 'rgba(255,170,40,0.9)'], [1, 'rgba(255,170,40,0)']]); g.restore();
+    g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 3; circ(g, W / 2, H / 2, 172); g.stroke(); g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 9; circ(g, W / 2, H / 2, 164); g.stroke();
+    g.fillStyle = '#cfd6dd'; g.font = '11px monospace'; g.fillText('SAMPLE 07   400x', 16, 24); g.fillText('colonies: 7', 16, 40); g.fillRect(W - 110, H - 22, 60, 2); g.fillText('50 µm', W - 100, H - 28);
+  });
+  S('Floating-world print', 'A Japanese woodblock print: flat indigo night, graded sky, bold black keylines, patterned ground, a red seal in the corner.', 'Weather becomes the star: rain as ruled lines, fog as blank paper, wind bending everything one way.', (g, r) => {
+    const q = g.createLinearGradient(0, 0, 0, H); q.addColorStop(0, '#16233f'); q.addColorStop(0.35, '#2f4a6a'); q.addColorStop(1, '#d9c9a0'); g.fillStyle = q; g.fillRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(30,50,80,0.25)'; g.lineWidth = 1; for (let y = 130; y < H + 20; y += 14) for (let x = (y / 14 % 2) * 14; x < W + 28; x += 28) { for (let k = 1; k <= 3; k++) { g.beginPath(); g.arc(x, y, k * 4.5, Math.PI, TAU); g.stroke(); } }
+    rad(g, FIRE.x, FIRE.y, 150, [[0, 'rgba(240,200,140,0.95)'], [0.7, 'rgba(240,200,140,0.5)'], [1, 'rgba(240,200,140,0)']]);
+    const K = '#14100c'; walls(g, (x, y) => { g.fillStyle = '#8a6a4a'; g.fillRect(x, y, T, T); g.strokeStyle = K; g.lineWidth = 2; g.strokeRect(x, y, T, T); g.lineWidth = 1; g.beginPath(); for (let k = 1; k < 4; k++) { g.moveTo(x, y + k * 8); g.lineTo(x + T, y + k * 8); } g.stroke(); });
+    zs(g, (s) => { body(g, s, s > 14 ? '#3a4a5a' : '#6f8a7a', K, 2); g.fillStyle = '#c8281e'; circ(g, s * 0.7, -s * 0.2, 1.5); g.fill(); circ(g, s * 0.7, s * 0.2, 1.5); g.fill(); g.strokeStyle = K; g.lineWidth = 1; for (let k = 0; k < 5; k++) { g.beginPath(); g.moveTo(-s * 0.5, (k - 2) * s * 0.3); g.lineTo(-s * 1.6, (k - 2) * s * 0.4 + 3); g.stroke(); } });
+    for (const [x, y, s] of BLOOD) { g.fillStyle = '#c8281e'; g.beginPath(); for (let k = 0; k <= 10; k++) { const a = k / 10 * TAU, d = s * (k % 2 ? 0.5 : 1); g.lineTo(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.6); } g.fill(); }
+    at(g, ME.x, ME.y, ME.a, () => { body(g, 10, '#e8e0cc', K, 2); g.fillStyle = K; g.fillRect(6, 2, 24, 3.5); });
+    g.fillStyle = '#c8281e'; circ(g, FIRE.x, FIRE.y, 15); g.fill(); g.strokeStyle = K; g.lineWidth = 2; g.stroke(); g.fillStyle = '#f0c040'; circ(g, FIRE.x, FIRE.y, 7); g.fill();
+    g.strokeStyle = 'rgba(20,16,12,0.35)'; g.lineWidth = 1; g.beginPath(); for (let k = 0; k < 90; k++) { const x = r() * (W + 80), y = r() * H; g.moveTo(x, y); g.lineTo(x - 22, y + 60); } g.stroke();
+    g.fillStyle = '#c8281e'; g.fillRect(W - 46, H - 62, 26, 42); g.fillStyle = '#f4ead0'; g.font = 'bold 12px serif'; g.fillText('七', W - 39, H - 44); g.fillText('夜', W - 39, H - 28); noise(g, 3000, 0.1, 6, ['255,255,240', '60,40,20']);
+  });
+  S('Propaganda poster', 'Three inks: red, black, cream. Hard diagonals, giant type, halftone dots. Light is a red wedge; the enemy is black geometry.', 'Announcements are the art: night banners, kill streaks and warnings slam in as poster headlines.', (g, r) => {
+    g.fillStyle = '#eadfc4'; g.fillRect(0, 0, W, H); const RED = '#c8201a', K = '#15120f';
+    g.fillStyle = RED; g.beginPath(); g.moveTo(ME.x, ME.y); g.lineTo(W, 190); g.lineTo(W, H); g.lineTo(470, H); g.closePath(); g.fill();
+    g.fillStyle = K; g.beginPath(); g.moveTo(0, 0); g.lineTo(240, 0); g.lineTo(0, 150); g.fill();
+    for (let y = 0; y < H; y += 9) for (let x = (y / 9 % 2) * 4.5; x < W; x += 9) { const d = Math.hypot(x - FIRE.x, y - FIRE.y), s = Math.max(0, 3.4 - d / 60); if (s > 0.3) { g.fillStyle = RED; circ(g, x, y, s); g.fill(); } }
+    walls(g, (x, y) => { g.fillStyle = K; g.fillRect(x, y, T - 3, T - 3); });
+    for (const [x, y, a, s] of ZS) at(g, x, y, a, () => { g.fillStyle = x > 440 ? '#eadfc4' : K; g.beginPath(); g.moveTo(s * 1.5, 0); g.lineTo(-s, -s * 1.1); g.lineTo(-s, s * 1.1); g.fill(); g.fillStyle = x > 440 ? K : RED; circ(g, s * 0.3, 0, s * 0.36); g.fill(); });
+    at(g, ME.x, ME.y, ME.a, () => { g.fillStyle = K; circ(g, 0, 0, 12); g.fill(); g.fillRect(0, -2.5, 34, 5); g.fillStyle = '#eadfc4'; circ(g, 0, 0, 5); g.fill(); });
+    g.fillStyle = K; g.beginPath(); for (let i = 0; i <= 20; i++) { const a = i / 20 * TAU, d = i % 2 ? 12 : 26; g.lineTo(FIRE.x + Math.cos(a) * d, FIRE.y + Math.sin(a) * d); } g.fill(); g.fillStyle = RED; circ(g, FIRE.x, FIRE.y, 9); g.fill();
+    g.save(); g.translate(22, 330); g.rotate(-0.105); g.fillStyle = K; g.font = '900 54px Impact, "Arial Black", sans-serif'; g.fillText('HOLD THE FIRE', 0, 0); g.restore(); g.fillStyle = '#eadfc4'; g.font = '900 20px Impact, "Arial Black", sans-serif'; g.fillText('NIGHT 7', 14, 30);
+    noise(g, 4000, 0.12, 7, ['255,255,240', '40,30,20']);
+  });
+  S('War-room map', 'You never see a zombie. You see a commander’s map: contour lines, grid references, blue symbols for your people, red diamonds for contacts.', 'Fog of war is honest: contacts are estimates until something of yours has eyes on them.', (g, r) => {
+    g.fillStyle = '#232b24'; g.fillRect(0, 0, W, H); g.strokeStyle = 'rgba(150,180,140,0.22)'; g.lineWidth = 1;
+    for (let k = 1; k < 9; k++) { g.beginPath(); for (let a = 0; a <= TAU + 0.1; a += 0.1) { const d = k * 44 * (1 + 0.16 * Math.sin(a * 3 + k) + 0.1 * Math.sin(a * 5 - k * 2)); g.lineTo(140 + Math.cos(a) * d * 1.4, 60 + Math.sin(a) * d); } g.stroke(); }
+    g.strokeStyle = 'rgba(200,220,190,0.14)'; g.beginPath(); for (let x = 0; x < W; x += 64) { g.moveTo(x, 0); g.lineTo(x, H); } for (let y = 20; y < H; y += 64) { g.moveTo(0, y); g.lineTo(W, y); } g.stroke();
+    g.fillStyle = 'rgba(200,220,190,0.5)'; g.font = '10px monospace'; for (let x = 0; x < W; x += 64) g.fillText(String.fromCharCode(65 + x / 64), x + 4, 12); for (let y = 20; y < H; y += 64) g.fillText(String(1 + (y - 20) / 64), 4, y + 14);
+    g.strokeStyle = '#d8e0d0'; g.lineWidth = 4; g.beginPath(); g.moveTo(448, 176); g.lineTo(448, 112); g.lineTo(208, 112); g.lineTo(208, 240); g.stroke();
+    const B = '#5ab0ff', RD = '#ff4a3a'; g.lineWidth = 1.6; g.strokeStyle = B; g.strokeRect(ME.x - 12, ME.y - 8, 24, 16); g.beginPath(); g.moveTo(ME.x - 12, ME.y - 8); g.lineTo(ME.x + 12, ME.y + 8); g.moveTo(ME.x + 12, ME.y - 8); g.lineTo(ME.x - 12, ME.y + 8); g.stroke();
+    g.strokeRect(TUR.x - 9, TUR.y - 7, 18, 14); circ(g, TUR.x, TUR.y, 2.5); g.stroke(); g.setLineDash([6, 5]); circ(g, TUR.x, TUR.y, 100); g.stroke(); g.setLineDash([]);
+    g.strokeStyle = '#ffb040'; circ(g, FIRE.x, FIRE.y, 8); g.stroke(); g.beginPath(); g.moveTo(FIRE.x, FIRE.y - 14); g.lineTo(FIRE.x, FIRE.y + 14); g.moveTo(FIRE.x - 14, FIRE.y); g.lineTo(FIRE.x + 14, FIRE.y); g.stroke();
+    ZS.forEach(([x, y, a, s], i) => { g.strokeStyle = RD; g.fillStyle = 'rgba(255,74,58,0.18)'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x, y - s); g.lineTo(x + s, y); g.lineTo(x, y + s); g.lineTo(x - s, y); g.closePath(); g.fill(); g.stroke(); g.setLineDash([3, 4]); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 54, y + Math.sin(a) * 54); g.stroke(); g.setLineDash([]); g.fillStyle = RD; g.fillText((s > 14 ? 'BRT' : 'Z') + '-' + (i + 1) + (i > 3 ? ' ?' : ''), x + s + 3, y - s); });
+    g.fillStyle = '#d8e0d0'; g.fillText('BREACH RISK  G4', 454, 204); vig(g, 0.5);
+  });
+  S('Corrupted tape', 'Found footage that is falling apart. Colours split, rows of the picture slide sideways, and the tracking bar eats part of the screen.', 'Damage is corruption: the more hurt you are, the less you can trust the picture.', (g, r) => {
+    const c = mk(W, H), q = c.getContext('2d'); flat(q, { bg: '#1c2a1e', lit: 'rgba(200,150,80,0.9)', wall: '#8a929a', blood: '#a01018', brute: '#7a4a8a', z: '#8fb070', me: '#d0483c', gun: '#111', fire: '#ffd060' });
+    g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'lighter';
+    for (const [dx, col] of [[-5, '#ff0000'], [0, '#00ff00'], [6, '#0000ff']]) { const t = mk(W, H), tq = t.getContext('2d'); tq.drawImage(c, dx, 0); tq.globalCompositeOperation = 'multiply'; tq.fillStyle = col; tq.fillRect(0, 0, W, H); g.drawImage(t, 0, 0); }
+    g.globalCompositeOperation = 'source-over'; const snap = mk(W, H); snap.getContext('2d').drawImage(g.canvas, 0, 0);
+    for (let k = 0; k < 9; k++) { const y = r() * H, h = 4 + r() * 22; g.drawImage(snap, 0, y, W, h, (r() - 0.5) * 90, y, W, h); }
+    g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(0, 268, W, 34); for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(255,255,255,${r() * 0.8})`; g.fillRect(r() * W, 268 + r() * 34, 2 + r() * 14, 1.5); }
+    for (let k = 0; k < 14; k++) { g.fillStyle = ['#ff00aa', '#00ffe0', '#fff'][(r() * 3) | 0]; g.fillRect((r() * W / 16 | 0) * 16, (r() * H / 16 | 0) * 16, 16 + (r() * 3 | 0) * 16, 8); }
+    g.fillStyle = 'rgba(0,0,0,0.25)'; for (let y = 0; y < H; y += 2) g.fillRect(0, y, W, 1); g.fillStyle = '#fff'; g.font = 'bold 18px monospace'; g.fillText('PLAY ▶', 22, 34); g.fillText('SP  0:13:07', W - 150, H - 20);
+  });
+  S('Felt and buttons', 'Hand-sewn felt toys on a quilt. Blanket-stitch edges, button eyes with loose threads, stuffing where the blood should be.', 'Gore becomes stuffing and thread. Could double as the Reduced gore mode for the real game.', (g, r) => {
+    g.fillStyle = '#3f5a48'; g.fillRect(0, 0, W, H); for (let i = 0; i < 9000; i++) { g.strokeStyle = `rgba(${r() < 0.5 ? '255,255,255' : '0,0,0'},${r() * 0.07})`; const x = r() * W, y = r() * H, a = r() * TAU; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 5, y + Math.sin(a) * 5); g.stroke(); }
+    const patch = (fn, col) => { g.save(); g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowOffsetY = 3; g.shadowBlur = 4; g.fillStyle = col; fn(); g.fill(); g.restore(); g.strokeStyle = 'rgba(255,250,235,0.9)'; g.lineWidth = 1.3; g.setLineDash([4, 3]); fn(); g.stroke(); g.setLineDash([]); };
+    patch(() => { g.beginPath(); g.ellipse(FIRE.x, FIRE.y, 150, 100, 0, 0, TAU); }, '#a8885a');
+    walls(g, (x, y) => patch(() => { g.beginPath(); g.roundRect(x + 2, y + 2, T - 4, T - 4, 5); }, '#8f98a6'));
+    const btn = (x, y, s) => { g.fillStyle = '#16120e'; circ(g, x, y, s); g.fill(); g.fillStyle = '#d8d0c0'; circ(g, x - s * 0.3, y, s * 0.18); g.fill(); circ(g, x + s * 0.3, y, s * 0.18); g.fill(); };
+    zs(g, (s) => { patch(() => { g.beginPath(); g.roundRect(0, -s * 0.95, s * 1.4, s * 0.4, 3); g.roundRect(0, s * 0.55, s * 1.2, s * 0.4, 3); }, '#86a86a'); patch(() => { g.beginPath(); g.ellipse(0, 0, s * 0.72, s, 0, 0, TAU); }, s > 14 ? '#7a5a8a' : '#5a6a84'); patch(() => circ(g, s * 0.5, 0, s * 0.55), '#86a86a'); btn(s * 0.6, -s * 0.24, s * 0.2); btn(s * 0.6, s * 0.26, s * 0.14); g.strokeStyle = '#16120e'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(s * 0.6, s * 0.26); g.quadraticCurveTo(s * 1.1, s * 0.6, s * 0.9, s * 0.9); g.stroke(); });
+    for (const [x, y, s] of BLOOD) { for (let k = 0; k < 7; k++) { g.fillStyle = '#f4f0e6'; circ(g, x + (r() - 0.5) * s * 2, y + (r() - 0.5) * s * 1.2, 3 + r() * 5); g.fill(); } g.strokeStyle = '#c0202a'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x - s, y); for (let k = 0; k < 8; k++) g.lineTo(x - s + k * s * 0.3, y + Math.sin(k * 2) * 6); g.stroke(); }
+    at(g, ME.x, ME.y, ME.a, () => { patch(() => { g.beginPath(); g.ellipse(0, 0, 8, 11, 0, 0, TAU); }, '#c8483c'); patch(() => circ(g, 5, 0, 6), '#f0cfa8'); patch(() => { g.beginPath(); g.roundRect(8, 2, 22, 5, 2); }, '#2a2a2e'); });
+    patch(() => { g.beginPath(); g.moveTo(FIRE.x - 13, FIRE.y + 8); g.quadraticCurveTo(FIRE.x - 16, FIRE.y - 10, FIRE.x, FIRE.y - 24); g.quadraticCurveTo(FIRE.x + 16, FIRE.y - 8, FIRE.x + 13, FIRE.y + 8); g.closePath(); }, '#e8782a'); patch(() => { g.beginPath(); g.ellipse(FIRE.x, FIRE.y, 6, 9, 0, 0, TAU); }, '#f8d050'); vig(g, 0.45);
+  });
+  S('Black-light', 'Lights off, UV on. The world is near-black violet, and only certain things fluoresce: blood, bile, the veins of the dead, and warnings someone painted before you came.', 'Old blood never fades under UV: the ground keeps a glowing record of every fight, and hidden messages appear.', (g, r) => {
+    g.fillStyle = '#0a0418'; g.fillRect(0, 0, W, H); noise(g, 3000, 0.25, 8, ['70,30,150']);
+    walls(g, (x, y) => { g.fillStyle = '#1a0c36'; g.fillRect(x + 1, y + 1, T - 2, T - 2); g.strokeStyle = '#4a2a9a'; g.lineWidth = 1; g.strokeRect(x + 1.5, y + 1.5, T - 3, T - 3); });
+    g.globalCompositeOperation = 'lighter'; const neon = (col, b) => { g.shadowColor = col; g.shadowBlur = b; g.strokeStyle = col; g.fillStyle = col; };
+    neon('#3dffb0', 10); for (let k = 0; k < 16; k++) { const x = r() * W, y = r() * H, s = 4 + r() * 12; for (let j = 0; j < 7; j++) { g.globalAlpha = 0.25 + r() * 0.6; circ(g, x + (r() - 0.5) * s * 3, y + (r() - 0.5) * s * 2, 0.8 + r() * s * 0.3); g.fill(); } } g.globalAlpha = 1;
+    for (const [x, y, s] of BLOOD) for (let j = 0; j < 12; j++) { circ(g, x + (r() - 0.5) * s * 2.6, y + (r() - 0.5) * s * 1.8, 1 + r() * s * 0.4); g.fill(); }
+    zs(g, (s) => { neon('#b8ff3a', 8); g.lineWidth = 1.1; g.beginPath(); for (let k = 0; k < 5; k++) { let px = -s * 0.5, py = (k - 2) * s * 0.3; g.moveTo(px, py); for (let j = 0; j < 4; j++) { px += s * 0.35; py += (r() - 0.5) * s * 0.5; g.lineTo(px, py); } } g.stroke(); neon('#fff', 10); circ(g, s * 0.7, -s * 0.2, 1.5); g.fill(); circ(g, s * 0.7, s * 0.2, 1.5); g.fill(); });
+    neon('#c8a0ff', 14); at(g, ME.x, ME.y, ME.a, () => { g.beginPath(); g.ellipse(0, 0, 7, 10, 0, 0, TAU); g.fill(); }); neon('#ff7a2a', 24); circ(g, FIRE.x, FIRE.y, 7); g.fill();
+    neon('#ff3aa0', 12); g.font = 'bold 26px cursive'; g.save(); g.translate(40, 70); g.rotate(-0.08); g.fillText('DON’T SLEEP', 0, 0); g.restore(); g.lineWidth = 2; g.beginPath(); g.moveTo(450, 196); g.lineTo(486, 222); g.lineTo(476, 208); g.moveTo(486, 222); g.lineTo(470, 222); g.stroke();
+    g.shadowBlur = 0; g.globalCompositeOperation = 'source-over'; vig(g, 0.6);
+  });
+  S('Long exposure', 'A camera with the shutter left open. Nothing solid exists: only light, and everything that moved leaves a streak where it has been.', 'You read the past: eye-trails show each zombie’s path, tracers hang in the air, and standing still makes you vanish.', (g, r) => {
+    g.fillStyle = '#020204'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'lighter'; g.lineCap = 'round';
+    const trail = (x, y, a, len, col, w) => { for (const off of [-3, 3]) { let px = x - Math.sin(a) * off, py = y + Math.cos(a) * off, an = a + Math.PI; g.shadowColor = col; g.shadowBlur = 8; for (let k = 0; k < len; k++) { g.strokeStyle = col; g.globalAlpha = (1 - k / len) * 0.9; g.lineWidth = w * (1 - k / len) + 0.3; g.beginPath(); g.moveTo(px, py); an += (r() - 0.5) * 0.5; px += Math.cos(an) * 7; py += Math.sin(an) * 7; g.lineTo(px, py); g.stroke(); } } g.globalAlpha = 1; };
+    for (const [x, y, a, s] of ZS) trail(x, y, a, s > 14 ? 26 : 16 + (r() * 10 | 0), s > 14 ? '#ff5a2a' : '#ffe05a', s > 14 ? 3 : 2);
+    g.shadowBlur = 0; for (let k = 0; k < 70; k++) { const a = ME.a - 0.34 + r() * 0.68, d = 60 + r() * 190; g.strokeStyle = `rgba(190,210,255,${0.03 + r() * 0.07})`; g.lineWidth = 1 + r() * 3; g.beginPath(); g.moveTo(ME.x + Math.cos(a) * 16, ME.y + Math.sin(a) * 16); g.lineTo(ME.x + Math.cos(a) * d, ME.y + Math.sin(a) * d); g.stroke(); }
+    for (let k = 0; k < 60; k++) { const a = r() * TAU, d = 6 + r() * 40; g.strokeStyle = `rgba(255,${130 + r() * 90 | 0},40,${0.15 + r() * 0.4})`; g.lineWidth = 1 + r() * 2; g.beginPath(); g.moveTo(FIRE.x + Math.cos(a) * 3, FIRE.y + Math.sin(a) * 3); g.quadraticCurveTo(FIRE.x + Math.cos(a + 0.8) * d * 0.6, FIRE.y + Math.sin(a + 0.8) * d * 0.6 - 10, FIRE.x + Math.cos(a) * d * 0.5, FIRE.y - d); g.stroke(); }
+    walls(g, (x, y) => { const k = Math.max(0, 1 - Math.hypot(x + 16 - FIRE.x, y + 16 - FIRE.y) / 190); g.strokeStyle = `rgba(255,150,70,${k * 0.8})`; g.lineWidth = 1.5; g.beginPath(); if (y < FIRE.y - 40) { g.moveTo(x, y + T); g.lineTo(x + T, y + T); } else if (x < FIRE.x) { g.moveTo(x + T, y); g.lineTo(x + T, y + T); } else { g.moveTo(x, y); g.lineTo(x, y + T); } g.stroke(); });
+    g.shadowColor = '#fff'; g.shadowBlur = 10; for (let k = 0; k < 3; k++) { g.strokeStyle = `rgba(255,240,200,${0.9 - k * 0.3})`; g.lineWidth = 1.6; g.beginPath(); g.moveTo(ME.x + 24, ME.y + 12 + k * 5); g.lineTo(SHOT.x + k * 14, SHOT.y + k * 12); g.stroke(); }
+    g.strokeStyle = 'rgba(255,90,80,0.7)'; g.lineWidth = 2; g.beginPath(); g.moveTo(ME.x - 60, ME.y - 30); g.bezierCurveTo(ME.x - 30, ME.y - 50, ME.x - 20, ME.y + 10, ME.x, ME.y); g.stroke(); g.shadowBlur = 0; g.globalCompositeOperation = 'source-over';
+  });
+
+  const grid = document.getElementById('grid');
+  L.forEach((s, i) => {
+    const art = document.createElement('article'), cv = mk(W, H), txt = document.createElement('div'); txt.className = 'txt';
+    const h2 = document.createElement('h2'), n = document.createElement('span'); n.textContent = String(i + 11); h2.appendChild(n); h2.appendChild(document.createTextNode(s.name));
+    const p = document.createElement('p'); p.textContent = s.pitch;
+    const dl = document.createElement('dl'), dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = 'Twist'; dd.textContent = s.twist; dl.appendChild(dt); dl.appendChild(dd);
+    txt.appendChild(h2); txt.appendChild(p); txt.appendChild(dl); art.appendChild(cv); art.appendChild(txt); grid.appendChild(art);
+    const g = cv.getContext('2d');
+    try { s.draw(g, rng(100 + i * 7)); } catch (e) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.fillStyle = '#fff'; g.font = '14px sans-serif'; g.fillText('Could not draw: ' + e.message, 20, 40); document.title += ' !' + (i + 11); console.error(s.name, e); }
+  });
+})();
+</script>
+</body>
+</html>

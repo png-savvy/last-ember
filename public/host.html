@@ -170,6 +170,7 @@
   #termBtn { font-family: Consolas, monospace; }
   #fatal { background: rgba(0,0,0,0.9); font-size: 22px; text-align: center; }
 </style>
+<link rel="stylesheet" href="/looks.css">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -202,7 +203,7 @@
   <div class="panel bar">
     <div class="grp"><input id="kbName" maxlength="14" placeholder="Your name" autocomplete="off" spellcheck="false"><button class="btn" id="kbBtn">Play on this keyboard</button></div>
     <div class="grp"><span class="lbl">DIFFICULTY</span><button class="btn" data-diff="easy">Easy</button><button class="btn" data-diff="normal">Normal</button><button class="btn" data-diff="hard">Hard</button></div>
-    <div class="grp"><button class="btn" id="audioBtn">Audio</button><a class="btn" href="/sounds" target="_blank" style="text-decoration:none">Sound test</a><button class="btn" id="devBtn">Dev mode</button><button class="btn" id="termBtn" title="Admin terminal (` key)">&gt;_ Terminal</button></div>
+    <div class="grp"><button class="btn" id="audioBtn">Audio</button><button class="btn" id="gfxBtn">Graphics</button><a class="btn" href="/sounds" target="_blank" style="text-decoration:none">Sound test</a><button class="btn" id="devBtn">Dev mode</button><button class="btn" id="termBtn" title="Admin terminal (` key)">&gt;_ Terminal</button></div>
     <span class="sp"></span>
     <button class="btn go resume" id="resumeRunBtn" style="display:none"></button>
     <button class="btn go" id="startBtn" disabled>Waiting for survivors...</button>
@@ -260,6 +261,7 @@
       <button class="btn" id="saveBtn">Save game  (S)</button>
       <button class="btn" id="quitBtn">Quit to main menu  (Q)</button>
       <button class="btn" id="pAudioBtn">Audio</button>
+      <button class="btn" id="pGfxBtn">Graphics</button>
       <button class="btn" id="pDevMoney">Dev: infinite funds OFF</button>
     </div>
   </div>
@@ -282,10 +284,11 @@
       <a href="/sounds" target="_blank" style="color:#ffb54a;font-weight:700;font-size:14px">Open the full sound test page (every gun one by one, day / night / boss music) ↗</a>
     </div>
     <div class="row" style="margin:0;width:min(460px,90vw)">
-      <button class="btn" id="aMusic">Music: ON</button><button class="btn" id="aMute">Sound: ON</button><button class="btn" id="aGore">Gore: Full</button><button class="btn" id="aSharp" title="Auto lowers the drawing resolution in heavy fights to keep it smooth">Graphics: Auto</button><button class="btn go" id="aClose" style="flex:1 1 140px">Done</button>
+      <button class="btn" id="aMusic">Music: ON</button><button class="btn" id="aMute">Sound: ON</button><button class="btn go" id="aClose" style="flex:1 1 140px">Done</button>
     </div>
   </div>
 </div>
+<div id="gfxPanel" class="overlay" style="z-index:26"><div class="panel" id="gfxBody"></div></div>
 <div id="fatal" class="overlay"><div id="fatalMsg"></div></div>
 <div id="toast"></div>
 <button id="soundHint">&#128263; Sound is off on this screen &middot; click here or press any key</button>
@@ -295,6 +298,14 @@
 <script src="/js/sim.js"></script>
 <script src="/js/audio.js"></script>
 <script src="/js/render.js"></script>
+<script src="/js/look-charcoal.js"></script>
+<script src="/js/look-woodcut.js"></script>
+<script src="/js/look-watercolour.js"></script>
+<script src="/js/look-glass.js"></script>
+<script src="/js/look-stitch.js"></script>
+<script src="/js/look-puppet.js"></script>
+<script src="/js/look-kid.js"></script>
+<script src="/js/gfxmenu.js"></script>
 <script src="/js/netview.js"></script>
 <script src="/js/shopui.js"></script>
 <script src="/js/host.js"></script>

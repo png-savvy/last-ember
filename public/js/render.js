@@ -57,8 +57,49 @@
 
   const ACIDY = { bloater: 1, splitter: 1, splitling: 1, broodmother: 1 };   // these bleed green-purple goo
   // Real blood is dark: deep reds and near-black maroons, never bright red. Every stain mixes several of these.
-  const BLOOD = ['#4c0707', '#3c0505', '#2f0404', '#560a09', '#250303', '#420806'];
-  const BILE = ['#2b3312', '#343b16', '#20270d', '#3a3a1a'];        // what the bloated ones leak: dark, sickly
+  let BLOOD = ['#4c0707', '#3c0505', '#2f0404', '#560a09', '#250303', '#420806'];
+  // ---- graphics styles (Settings, kept per device). 'classic' is the painted look; the others restyle the same game.
+  // sound: the music and gun-sound styles that suit the look (applied when "Sound follows the look" is on)
+  const STYLES = [
+    { id: 'classic', name: 'Classic', blurb: 'The painted look: moonlit grass, warm firelight, full colour.' },
+    { id: 'charcoal', name: 'Charcoal and ember', blurb: 'A charcoal drawing. Only fire, muzzle flash and blood have colour.', sound: { music: 'drone', guns: 'real' } },
+    { id: 'woodcut', name: 'Woodcut print', blurb: 'Black ink cut with bone-white lines. Light is carved rays; red for blood and eyes.', sound: { music: 'cathedral', guns: 'western' } },
+    { id: 'glass', name: 'Stained glass', blurb: 'A cathedral window: leaded panes in jewel colours, the campfire a gold sun. Damage cracks the glass.', sound: { music: 'requiem', guns: 'heavy' } },
+    { id: 'watercolour', name: 'Bleeding watercolour', blurb: 'Pale washes and pencil on rough paper. Night is a white fog; blood is the one strong pigment.', sound: { music: 'strings', guns: 'suppressed' } },
+    { id: 'puppet', name: 'Shadow puppet theatre', blurb: 'A lamp behind a cloth screen. Everything is a black cut-out; far from the lamp the shadows grow huge and soft.', sound: { music: 'ritual', guns: 'real' } },
+    { id: 'kid', name: 'A child drew this', blurb: 'Wax crayon on lined paper, drawn by the youngest survivor. The drawings get darker as the nights go on.', sound: { music: 'musicbox', guns: 'cartoon' } },
+    { id: 'stitch', name: 'Cross-stitch sampler', blurb: 'The whole game embroidered on linen, one X of thread at a time. Every kill leaves a loose red thread on the cloth.', sound: { music: 'musicbox', guns: 'cap' } },
+  ];
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
+  // The look is more than the picture: menus (looks.css keys off <html data-look>) and, if wanted, the sound follow it.
+  // byUser: the player just picked it (only then is the sound changed; a page load never overrides sound choices).
+  function setTheme(id, byUser) {
+    const o = STYLES.find((q) => q.id === id) || STYLES[0];
+    if (root.document) root.document.documentElement.dataset.look = o.id;
+    const AF = root.AudioFX;
+    if (!byUser || !AF || lsGet('le_looksound') === '0') return;
+    if (o.sound) {
+      if (!lsGet('le_snd_own')) lsSet('le_snd_own', JSON.stringify({ music: AF.getMusicStyle(), guns: AF.getGunStyle() }));     // remember the player's own choice
+      AF.setMusicStyle(o.sound.music); AF.setGunStyle(o.sound.guns);
+    } else {
+      let own = null; try { own = JSON.parse(lsGet('le_snd_own') || 'null'); } catch (e) { own = null; }
+      if (own) { AF.setMusicStyle(own.music); AF.setGunStyle(own.guns); lsSet('le_snd_own', ''); }
+    }
+  }
+  { const st = lsGet('le_style'); setTheme(STYLES.some((o) => o.id === st) ? st : 'classic', false); }
+  const lookOf = (id) => (root.Renderer && root.Renderer.LOOKS && root.Renderer.LOOKS[id]) || null;
+  const BLOOD_CLASSIC = BLOOD, BLOOD_INK = ['#9a110c', '#b3160f', '#7d0d0a', '#a8140e', '#8a0f0b', '#c01a12'];   // on a grey page blood is the one loud colour
+  // a colour as the grey a charcoal stick would leave ('#rrggbb' or 'rgb(r,g,b)')
+  function toGrey(col) {
+    let r, g, b;
+    if (col[0] === '#') { const n = parseInt(col.slice(1), 16); r = n >> 16; g = (n >> 8) & 255; b = n & 255; }
+    else { const m = col.match(/\d+/g); if (!m) return col; r = +m[0]; g = +m[1]; b = +m[2]; }
+    const v = Math.round(r * 0.3 + g * 0.59 + b * 0.11);
+    return `rgb(${v},${v},${Math.min(255, v + 2)})`;
+  }
+  let BILE = ['#2b3312', '#343b16', '#20270d', '#3a3a1a'];        // what the bloated ones leak: dark, sickly
+  const BILE_CLASSIC = BILE, BILE_INK = ['#141416', '#1c1c1f', '#0e0e10', '#232326'];     // bile is just more charcoal
   const pickOf = (a) => a[(Math.random() * a.length) | 0];
   // whatever colour a caller asks for, gore comes out of the palettes above
   function goreCol(c) {
@@ -158,6 +199,9 @@
       this.shake = 0;
       this.gore = 2;                      // 2 full, 1 reduced, 0 off (settings; kept per device)
       try { const g = localStorage.getItem('le_gore'); if (g !== null && g !== '') this.gore = Math.max(0, Math.min(2, +g || 0)); } catch (e) { /* default */ }
+      this.style = 'classic';             // graphics style (settings; kept per device)
+      try { const st = localStorage.getItem('le_style'); if (STYLES.some((o) => o.id === st)) this.style = st; } catch (e) { /* default */ }
+      this.usePalette();
       this.dark = 0;
       this.time = 0;
       this.fadeT = 0;
@@ -194,6 +238,102 @@
       parent.insertBefore(this.decals, this.canvas);
       parent.insertBefore(this.fx, this.canvas.nextSibling);
       parent.insertBefore(this.light, this.fx);
+      this.applyStyle();
+    }
+    // ---- graphics styles
+    ink(col) { return this.style === 'charcoal' ? toGrey(col) : this.lk && this.lk.corpse ? this.lk.corpse : col; }
+    // blood and bile colours for the style (a look may bring its own; charcoal uses the ink reds)
+    usePalette() {
+      const lk = lookOf(this.style) || {};
+      BLOOD = lk.blood || (this.style === 'charcoal' ? BLOOD_INK : BLOOD_CLASSIC); BILE = lk.bile || (this.style === 'charcoal' ? BILE_INK : BILE_CLASSIC);
+    }
+    setStyle(id) {
+      if (!STYLES.some((o) => o.id === id) || id === this.style) return;
+      this.style = id;
+      try { localStorage.setItem('le_style', id); } catch (e) { /* private mode */ }
+      setTheme(id, true);
+      this.usePalette(); this.lk = lookOf(id);
+      this.groundImg = null; this.paintGround(); this.bakeGround();
+      this.applyStyle();
+    }
+    // Charcoal: the world layer is shown in greys (one filter on the graphics card), a sheet of charcoal strokes lies over
+    // it, and only what is drawn above it keeps colour: flame, muzzle flash, blood.
+    applyStyle() {
+      this.lk = (Renderer.LOOKS && Renderer.LOOKS[this.style]) || null;     // a style's own drawing code (look-<style>.js)
+      this.sprites = {};
+      if (!this.layered) return;
+      const ch = this.style === 'charcoal';
+      this.canvas.style.filter = ch ? 'grayscale(1) contrast(1.18)' : (this.lk && this.lk.filter) || '';
+      this.ground.style.filter = (this.lk && this.lk.filter && this.lk.filterGround) ? this.lk.filter : '';
+      this.canvas.style.mixBlendMode = this.decals.style.mixBlendMode = (this.lk && this.lk.blend) || '';       // watercolour: pigment soaks into the paper
+      if (ch && !this.paper) {
+        const pw = W / 2, ph = H / 2, cv = this.paper = mk(pw, ph), g = cv.getContext('2d');
+        g.lineCap = 'round';
+        for (let i = 0; i < 3800; i++) {
+          const x = rand(0, pw), y = rand(0, ph), a = -0.75 + rand(-0.18, 0.18), l = rand(4, 15), dk = Math.random() < 0.62;
+          g.strokeStyle = dk ? `rgba(8,8,10,${rand(0.06, 0.2)})` : `rgba(240,236,226,${rand(0.04, 0.12)})`; g.lineWidth = rand(0.4, 1.3);
+          g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+        }
+        for (let i = 0; i < 5000; i++) { g.fillStyle = Math.random() < 0.5 ? `rgba(0,0,0,${rand(0.03, 0.14)})` : `rgba(255,255,255,${rand(0.02, 0.08)})`; g.fillRect(rand(0, pw), rand(0, ph), 1, 1); }
+        cv.classList.add('rlayer');
+        Object.assign(cv.style, { position: 'fixed', left: '0px', top: '0px', transformOrigin: '0 0', pointerEvents: 'none', width: W + 'px', height: H + 'px' });
+        this.canvas.parentNode.insertBefore(cv, this.fx);          // above the darkness: the pale strokes still show in the dark
+        this.lastTf = '';
+      }
+      if (this.paper) this.paper.style.visibility = ch ? '' : 'hidden';
+      // a look may lay its own sheet over the world, under the darkness (cross-stitch: the cloth the picture shows through)
+      if (this.lkLayer) { this.lkLayer.remove(); this.lkLayer = null; }
+      if (this.lk && this.lk.overlay) {
+        const cv = this.lkLayer = this.lk.overlay(this);
+        cv.classList.add('rlayer');
+        Object.assign(cv.style, { position: 'fixed', left: '0px', top: '0px', transformOrigin: '0 0', pointerEvents: 'none', width: W + 'px', height: H + 'px' });
+        this.canvas.parentNode.insertBefore(cv, this.light);
+        this.lastTf = '';
+      }
+    }
+    paintGroundCharcoal() {
+      const g = this.ground.getContext('2d');
+      g.globalAlpha = 1; g.fillStyle = '#8b8881'; g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 170; i++) {                       // smudges: rubbed-in darks, lifted lights
+        const x = rand(0, W), y = rand(0, H), r = rand(60, 240), c = Math.random() < 0.6 ? '40,40,44' : '196,192,182';
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, `rgba(${c},0.24)`); gr.addColorStop(1, `rgba(${c},0)`);
+        g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+      let gr = g.createRadialGradient(FIRE.x, FIRE.y, 30, FIRE.x, FIRE.y, 340);     // the trampled clearing: bare paper
+      gr.addColorStop(0, 'rgba(214,210,200,0.9)'); gr.addColorStop(0.6, 'rgba(190,186,176,0.45)'); gr.addColorStop(1, 'rgba(190,186,176,0)');
+      g.fillStyle = gr; g.fillRect(FIRE.x - 350, FIRE.y - 350, 700, 700);
+      g.lineCap = 'round';
+      for (let i = 0; i < 15000; i++) {                     // hatching, all leaning the same way like a right hand draws
+        const x = rand(0, W), y = rand(0, H), a = -0.75 + rand(-0.2, 0.2), l = rand(7, 26), dk = Math.random() < 0.66;
+        g.strokeStyle = dk ? `rgba(14,14,16,${rand(0.05, 0.2)})` : `rgba(232,228,216,${rand(0.05, 0.16)})`; g.lineWidth = rand(0.6, 1.9);
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+      }
+      for (let i = 0; i < 2600; i++) {                      // grass: quick flicks of the stick
+        const x = rand(0, W), y = rand(0, H);
+        if (Math.hypot(x - FIRE.x, y - FIRE.y) < 200) continue;
+        g.strokeStyle = `rgba(16,16,18,${rand(0.25, 0.6)})`; g.lineWidth = rand(0.8, 1.6);
+        g.beginPath(); for (let k = -1; k <= 1; k++) { g.moveTo(x, y); g.lineTo(x + k * 4 + rand(-1.5, 1.5), y - rand(6, 12)); } g.stroke();
+      }
+      for (let i = 0; i < 90; i++) {                        // stones: an outline gone over twice, a shadow rubbed under
+        const x = rand(0, W), y = rand(0, H), r = rand(3, 8), rot = rand(0, 3);
+        g.fillStyle = 'rgba(10,10,12,0.4)'; g.beginPath(); g.ellipse(x + 2, y + 2.5, r, r * 0.7, rot, 0, TAU); g.fill();
+        g.fillStyle = '#b9b5ab'; g.beginPath(); g.ellipse(x, y, r, r * 0.7, rot, 0, TAU); g.fill();
+        g.strokeStyle = 'rgba(12,12,14,0.8)'; g.lineWidth = 1;
+        for (let k = 0; k < 2; k++) { g.beginPath(); g.ellipse(x + rand(-0.8, 0.8), y + rand(-0.8, 0.8), r, r * 0.7, rot, 0, TAU); g.stroke(); }
+      }
+      const tree = (x, y, r) => {                           // the treeline: scribbled until the paper is black
+        g.fillStyle = 'rgba(10,10,12,0.8)'; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+        for (let k = 0; k < 9; k++) {
+          g.strokeStyle = k < 6 ? `rgba(6,6,8,${rand(0.4, 0.8)})` : `rgba(150,146,138,${rand(0.2, 0.45)})`; g.lineWidth = rand(1, 2.6);
+          const a0 = rand(0, TAU); g.beginPath(); g.ellipse(x + rand(-6, 6), y + rand(-6, 6), r * rand(0.5, 1.05), r * rand(0.4, 0.95), rand(0, 3), a0, a0 + rand(2.5, 5.5)); g.stroke();
+        }
+      };
+      for (let x = -10; x < W + 40; x += rand(34, 62)) { tree(x, rand(-22, -4), rand(26, 40)); tree(x, H + rand(4, 22), rand(26, 40)); }
+      for (let y = -10; y < H + 40; y += rand(34, 62)) { tree(rand(-22, -4), y, rand(26, 40)); tree(W + rand(4, 22), y, rand(26, 40)); }
+      gr = g.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, W * 0.62);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.4)');
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
     }
     // Keep the layers lined up with the camera (and the main canvas' visibility).
     placeLayers(sx, sy) {
@@ -203,10 +343,14 @@
       if (tf !== this.lastTf) {
         this.lastTf = tf;
         this.ground.style.transform = tf; this.decals.style.transform = tf; this.light.style.transform = tf;
+        if (this.paper) this.paper.style.transform = tf;
+        if (this.lkLayer) this.lkLayer.style.transform = tf;
       }
+      // the page "boils": the stroke sheet shifts a few times a second, like redrawn animation frames
+      if (this.paper && this.style === 'charcoal') { const bj = Math.floor(this.time * 6); if (bj !== this.boilJ) { this.boilJ = bj; this.paper.style.transform = this.lastTf + ` translate(${(bj * 37) % 23 - 11}px,${(bj * 53) % 19 - 9}px)`; } }
       if ((this.visT = (this.visT || 0) + 1) % 20 === 1) {
         const disp = root.getComputedStyle ? root.getComputedStyle(this.canvas).display : '';
-        for (const el of [this.ground, this.decals, this.light, this.fx]) if (el.style.display !== disp) el.style.display = disp;
+        for (const el of [this.ground, this.decals, this.light, this.fx, this.paper, this.lkLayer]) if (el && el.style.display !== disp) el.style.display = disp;
       }
     }
     // The ground becomes a fixed image: fast to draw and it cannot be wiped by the browser.
@@ -306,13 +450,17 @@
       this.camY = y1 <= y0 ? (y0 + y1) / 2 : clamp(y - this.viewH / 2, y0, y1);
     }
     clearWorld() {
+      if (this.lk && this.lk.reset) this.lk.reset(this);
       this.dctx.clearRect(0, 0, W, H);
       this.parts.length = 0; this.arcs.length = 0; this.rings.length = 0; this.flashes.length = 0; this.texts.length = 0; this.pools.length = 0;
     }
 
     // ---------------------------------------------------------- static art
     paintGround() {
+      if (this.style === 'charcoal') { this.paintGroundCharcoal(); return; }
+      { const lk = lookOf(this.style); if (lk && lk.ground) { const g2 = this.ground.getContext('2d'); g2.globalAlpha = 1; lk.ground(this, g2); return; } }
       const g = this.ground.getContext('2d');
+      g.globalAlpha = 1;
       g.fillStyle = '#35422a'; g.fillRect(0, 0, W, H);
       for (let i = 0; i < 70; i++) {
         const x = rand(0, W), y = rand(0, H), r = rand(80, 260);
@@ -386,6 +534,7 @@
     }
     sprite(id) {
       if (this.sprites[id]) return this.sprites[id];
+      if (this.lk && this.lk.sprite) { const sp = this.lk.sprite(this, id); if (sp) return (this.sprites[id] = sp); }
       const S = 2, c = mk(CELL * S, CELL * S), g = c.getContext('2d');
       g.scale(S, S);
       const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
@@ -627,11 +776,12 @@
     // Chunks that fly off and stay on the ground.
     gibs(x, y, n, look, acid) {
       if (this.gore < 2) n = 0;
+      if (n > 0 && this.lk && this.lk.fleck) { this.blood(x, y, rand(0, TAU), n * 2, acid ? pickOf(BILE) : pickOf(BLOOD), 320); return; }     // the style throws its own kind of pieces
       for (let i = 0; i < n; i++) {
         const a = rand(0, TAU), sp = rand(80, 260);
         const kind = Math.random();
         this.part({ k: 'gib', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.35, 0.6), max: 0.6, size: rand(2.5, 5.5), rot: rand(0, TAU), spin: rand(-12, 12),
-          c: kind < 0.45 ? (acid ? pickOf(BILE) : pickOf(BLOOD)) : kind < 0.9 ? shade(look.body, 0.45) : '#a89c84' });
+          c: kind < 0.45 ? (acid ? pickOf(BILE) : pickOf(BLOOD)) : kind < 0.9 ? this.ink(shade(look.body, 0.45)) : '#a89c84' });
       }
     }
     // The track a Burrower leaves: a dug furrow with crumbled, lighter edges and the odd crack, painted onto the ground.
@@ -664,6 +814,8 @@
       if (this.gore === 0) return;
       if (this.gore === 1) { alpha *= 0.55; r *= 0.75; }
       if (this.splatBudget-- <= 0) return;      // plenty of gore, but never a frame-time spike
+      // a graphics style can leave blood its own way (smears, cut ink, shards, stitches...): see splat() in look-*.js
+      if (this.lk && this.lk.splat) { this.lk.splat(this, this.dctx, x, y, r, BILE.indexOf(goreCol(color)) >= 0, alpha, ang); this.dctx.globalAlpha = 1; return; }
       const d = this.dctx, dir = ang !== undefined;
       for (let i = 0; i < 3; i++) {
         d.fillStyle = goreCol(color); d.globalAlpha = alpha * rand(0.45, 0.8);
@@ -687,7 +839,7 @@
     }
     // A pool that creeps outward from a body for a few seconds.
     pool(x, y, r, color) {
-      if (this.gore < 2) return;
+      if (this.gore < 2 || (this.lk && this.lk.splat)) return;
       (this.bpools || (this.bpools = [])).push({ x, y, r: r * 0.35, max: r, c: goreCol(color), dark: BILE.indexOf(goreCol(color)) >= 0 ? '#12170a' : '#170203', seed: Array.from({ length: 9 }, () => 0.7 + Math.random() * 0.5), t: 0 });
       if (this.bpools.length > 30) this.bpools.shift();
     }
@@ -700,6 +852,7 @@
     }
 
     handle(e, sim) {
+      if (this.lk && this.lk.event) this.lk.event(this, e, sim);
       switch (e.type) {
         case 'shot': {
           this.flashes.push({ x: e.x, y: e.y, r: e.wid === 'flamer' ? 70 : 130, life: 0.06, max: 0.06, c: '255,210,130' });
@@ -727,9 +880,10 @@
           this.splat(e.x, e.y, e.r * (big ? 2.4 : 1.9), acid ? '#4e6a18' : '#4e0a08', 0.7);
           this.splat(e.x + rand(-8, 8), e.y + rand(-8, 8), e.r * 1.1, acid ? '#6a8a20' : '#6e100c', 0.6);
           const d = this.dctx, R0 = e.r, torn = e.gib && this.gore === 2;
-          const bodyC = e.burn ? '#17130f' : shade(look.body, 0.55), headC = e.burn ? '#201a14' : shade(look.head, 0.55), armC = e.burn ? '#14100c' : shade(look.arm, 0.5);
+          const bodyC = e.burn ? '#17130f' : this.ink(shade(look.body, 0.55)), headC = e.burn ? '#201a14' : this.ink(shade(look.head, 0.55)), armC = e.burn ? '#14100c' : this.ink(shade(look.arm, 0.5));
           d.save(); d.translate(e.x, e.y); d.rotate((e.ang || 0) + rand(-0.5, 0.5)); d.lineCap = 'round';
-          if (this.gore === 0) {                       // gore off: a faint dust mark only
+          if (this.gore > 0 && this.lk && this.lk.body) this.lk.body(this, d, e, R0, torn, acid);      // the style draws its own dead
+          else if (this.gore === 0) {                       // gore off: a faint dust mark only
             d.globalAlpha = 0.25; d.fillStyle = '#3a3428'; d.beginPath(); d.ellipse(0, 0, R0, R0 * 0.8, 0, 0, TAU); d.fill();
           } else if (torn) {                           // overkill: blown apart, pieces flung around a wide pool
             for (let i = 0; i < 3; i++) { d.globalAlpha = 0.4; d.fillStyle = pickOf(acid ? BILE : BLOOD); blot(d, rand(-4, 4), rand(-4, 4), R0 * rand(1.2, 1.7), rand(1, 1.4), rand(0, TAU)); }
@@ -1038,6 +1192,7 @@
     }
 
     updateFx(dt, sim) {
+      if (this.lk && this.lk.tick) this.lk.tick(this, dt);
       this.time += dt;
       this.shake = Math.max(0, this.shake - dt * 40);
       const pitch = sim.phase === 'night' && !!(sim.forecast && sim.forecast.dark);
@@ -1054,7 +1209,8 @@
         const f = Math.exp(-drag * dt);
         p.vx *= f; p.vy *= f;
         if (p.life <= 0) {
-          if (p.k === 'blood') { const d = this.dctx; d.globalAlpha = rand(0.5, 0.85); d.fillStyle = p.c; drop(d, p.x, p.y, p.size * rand(1.6, 3.4), p.size * 0.75, Math.atan2(p.vy, p.vx)); d.globalAlpha = 1; }
+          if (p.k === 'blood' && this.lk && this.lk.splat) { /* the style leaves its own marks */ }
+          else if (p.k === 'blood') { const d = this.dctx; d.globalAlpha = rand(0.5, 0.85); d.fillStyle = p.c; drop(d, p.x, p.y, p.size * rand(1.6, 3.4), p.size * 0.75, Math.atan2(p.vy, p.vx)); d.globalAlpha = 1; }
           else if (p.k === 'gib') {
             const d = this.dctx;
             // a chunk skids to a stop: a dark smear dragged along its path, and the lump itself at the far end
@@ -1184,6 +1340,7 @@
 
     // ---------------------------------------------------------- entities
     drawStruct(c, s, alpha, noBase) {
+      if (this.lk && this.lk.struct && this.lk.struct(this, c, s, alpha, noBase)) return;
       const def = GD.STRUCTS[s.id];
       c.globalAlpha = alpha === undefined ? 1 : alpha;
       if (!noBase) c.drawImage(this.sprite(s.id), s.cx * CELL, s.cy * CELL, CELL, CELL);
@@ -1444,6 +1601,7 @@
       c.restore();
     }
     drawZombie(c, z) {
+      if (this.lk && this.lk.zombie) { this.lk.zombie(this, c, z); return; }
       const za = z.vis === undefined ? 1 : z.vis;
       c.globalAlpha = za;
       const L = ZLOOK[z.type] || ZLOOK.walker;
@@ -1808,6 +1966,7 @@
       }
     }
     drawPlayer(c, p) {
+      if (this.lk && this.lk.player) { this.lk.player(this, c, p); return; }
       c.save(); c.translate(p.x, p.y);
       if (p.down) {
         c.rotate(1.2 + p.x);
@@ -1875,13 +2034,40 @@
       for (const f of this.flashes) L = Math.max(L, (1 - Math.hypot(x - f.x, y - f.y) / f.r) * (f.life / f.max));
       return clamp(L, 0, 1);
     }
+    // everything that burns: fire, sparks, embers, acid, and the campfire's flames
+    drawHot(c, fireS) {
+      if (this.lk && this.lk.hot) { this.lk.hot(this, c, fireS); return; }
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = 'lighter';
+      for (const p of this.parts) {
+        const t = clamp(p.life / p.max, 0, 1);
+        if (p.k === 'fire') {
+          c.globalAlpha = 0.2 * t; c.fillStyle = t > 0.7 ? '#ffd27a' : t > 0.35 ? '#ff8a2c' : '#b8360f';
+          c.beginPath(); c.arc(p.x, p.y, p.size * (0.5 + t * 0.6), 0, TAU); c.fill();
+        } else if (p.k === 'acid') {
+          c.globalAlpha = 0.5 * t; c.fillStyle = '#9dff5a'; c.beginPath(); c.arc(p.x, p.y, p.size * (0.5 + t * 0.6), 0, TAU); c.fill();
+        } else if (p.k === 'spark' || p.k === 'ember') {
+          c.globalAlpha = t; c.fillStyle = p.k === 'ember' ? '#ffb050' : p.c; c.beginPath(); c.arc(p.x, p.y, p.size, 0, TAU); c.fill();
+        }
+      }
+      if (this.lk && this.lk.flames) this.lk.flames(this, c, fireS);
+      else for (let i = 0; i < 5 && fireS > 0; i++) {
+        const ph = this.time * (5 + i) + i * 2.1;
+        const r = (15 - i * 2.2 + Math.sin(ph) * 2.5) * fireS;
+        c.globalAlpha = 0.5;
+        c.fillStyle = ['#c8401a', '#ff7a2a', '#ff9d3c', '#ffd070', '#fff0c0'][i];
+        c.beginPath(); c.arc(FIRE.x + Math.sin(ph * 0.7) * 3, FIRE.y - i * 2 + Math.cos(ph) * 2, Math.max(2, r), 0, TAU); c.fill();
+      }
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = 'source-over';
+    }
     drawLighting(sim) {
       const l = this.lctx;
       l.setTransform(LIGHT_RES, 0, 0, LIGHT_RES, 0, 0);
       l.globalCompositeOperation = 'source-over';
       l.clearRect(0, 0, W, H);
       const fc = sim.phase === 'night' ? sim.forecast : null;
-      l.fillStyle = fc && fc.blood ? `rgba(30,4,8,${this.dark})` : fc && fc.dark ? `rgba(1,1,3,${this.dark})` : `rgba(6,10,24,${this.dark})`;   // blue moonlight; none at all on a pitch-black night
+      l.fillStyle = this.lk && this.lk.dark ? `rgba(${this.lk.dark},${Math.min(0.97, this.dark * (this.lk.darkK || 1.14))})` : fc && fc.blood ? `rgba(30,4,8,${this.dark})` : fc && fc.dark ? `rgba(1,1,3,${this.dark})` : `rgba(6,10,24,${this.dark})`;   // blue moonlight; none at all on a pitch-black night
       l.fillRect(0, 0, W, H);
       l.globalCompositeOperation = 'destination-out';
       const flick = 1 + 0.05 * Math.sin(this.time * 13) + 0.04 * Math.sin(this.time * 7.3);
@@ -1934,6 +2120,7 @@
       }
     }
     render(sim, ui) {
+      const inkStyle = !!(this.lk && this.lk.fxHot);        // the style draws flame and flying blood above the world layer
       this.checkLost(false);
       this.splatBudget = 40;
       // darkness 0..1 (0 in daylight): zombies outside any light are hidden, only their eyes show
@@ -1994,6 +2181,7 @@
         gr.addColorStop(0, `rgba(255,200,90,${0.55 * f})`); gr.addColorStop(0.55, `rgba(255,110,30,${0.42 * f})`); gr.addColorStop(1, 'rgba(160,40,10,0)');
         c.fillStyle = gr; c.beginPath(); c.arc(pl.x, pl.y, pl.r, 0, TAU); c.fill();
       }
+      if (this.lk && this.lk.under) this.lk.under(this, c, sim);
       for (const s of sim.structs) if (!GD.STRUCTS[s.id].block) this.drawStruct(c, s);
       for (const p of sim.players) if (!p.away && p.down) this.drawPlayer(c, p);
       c.fillStyle = 'rgba(0,0,0,0.3)';                          // a shadow under every solid build, drawn first so none falls on a neighbour
@@ -2102,6 +2290,8 @@
       for (const p of this.parts) {
         const t = clamp(p.life / p.max, 0, 1);
         if (p.k === 'blood') {
+          if (!inkStyle && this.lk && this.lk.fleck) { c.globalAlpha = 1; this.lk.fleck(this, c, p, BILE.indexOf(p.c) >= 0); continue; }
+          if (inkStyle) continue;                 // drawn above the grey layer instead, so it stays red
           c.globalAlpha = 0.9; c.strokeStyle = p.c; c.lineWidth = p.size; c.lineCap = 'round';
           c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035); c.stroke();
         } else if (p.k === 'debris') {
@@ -2112,31 +2302,10 @@
           c.globalAlpha = 0.28 * t; c.fillStyle = '#9a9a9a'; c.beginPath(); c.arc(p.x, p.y, p.size * (1.6 - t * 0.6), 0, TAU); c.fill();
         }
       }
-      c.globalAlpha = 1;
-      c.globalCompositeOperation = 'lighter';
-      for (const p of this.parts) {
-        const t = clamp(p.life / p.max, 0, 1);
-        if (p.k === 'fire') {
-          c.globalAlpha = 0.2 * t; c.fillStyle = t > 0.7 ? '#ffd27a' : t > 0.35 ? '#ff8a2c' : '#b8360f';
-          c.beginPath(); c.arc(p.x, p.y, p.size * (0.5 + t * 0.6), 0, TAU); c.fill();
-        } else if (p.k === 'acid') {
-          c.globalAlpha = 0.5 * t; c.fillStyle = '#9dff5a'; c.beginPath(); c.arc(p.x, p.y, p.size * (0.5 + t * 0.6), 0, TAU); c.fill();
-        } else if (p.k === 'spark' || p.k === 'ember') {
-          c.globalAlpha = t; c.fillStyle = p.k === 'ember' ? '#ffb050' : p.c; c.beginPath(); c.arc(p.x, p.y, p.size, 0, TAU); c.fill();
-        }
-      }
       // campfire flames (shrink as the horde beats the fire down)
       const fireK = sim.fireMax ? clamp(sim.fireHp / sim.fireMax, 0, 1) : 1;
       const fireS = sim.phase === 'over' && fireK <= 0 ? 0 : 0.45 + 0.55 * fireK;
-      for (let i = 0; i < 5 && fireS > 0; i++) {
-        const ph = this.time * (5 + i) + i * 2.1;
-        const r = (15 - i * 2.2 + Math.sin(ph) * 2.5) * fireS;
-        c.globalAlpha = 0.5;
-        c.fillStyle = ['#c8401a', '#ff7a2a', '#ff9d3c', '#ffd070', '#fff0c0'][i];
-        c.beginPath(); c.arc(FIRE.x + Math.sin(ph * 0.7) * 3, FIRE.y - i * 2 + Math.cos(ph) * 2, Math.max(2, r), 0, TAU); c.fill();
-      }
-      c.globalAlpha = 1;
-      c.globalCompositeOperation = 'source-over';
+      if (!inkStyle) this.drawHot(c, fireS);
       // Leviathan target markers: a red circle that tightens until the shell lands
       if (this.marks && this.marks.length) {
         for (const mk of this.marks) {
@@ -2177,6 +2346,17 @@
         c.translate(sx / this.scale, sy / this.scale);
       }
 
+      if (inkStyle) {                             // charcoal: flame and flying blood go above the grey layer and keep their colour
+        c.lineCap = 'round'; c.globalAlpha = 0.95;
+        for (const p of this.parts) {
+          if (p.k !== 'blood') continue;
+          if (this.lk.fleck) { c.globalAlpha = 1; this.lk.fleck(this, c, p, BILE.indexOf(p.c) >= 0); c.globalAlpha = 0.95; c.lineCap = 'round'; continue; }
+          c.strokeStyle = BILE.indexOf(p.c) >= 0 ? (this.lk.bileFx || '#161618') : (this.lk.bloodFx || '#b3160f'); c.lineWidth = p.size;
+          c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035); c.stroke();
+        }
+        this.drawHot(c, fireS);
+      }
+      if (this.lk && this.lk.over) this.lk.over(this, c, sim);
       // things that glow through the dark
       c.globalCompositeOperation = 'lighter';
       const eyeA = clamp(this.dark * 1.1, 0, 0.95);
@@ -2192,10 +2372,12 @@
           continue;
         }
         const hx = z.x + ca * r * 0.55, hy = z.y + sa * r * 0.55, e = r * 0.22;
-        c.globalAlpha = ea; c.fillStyle = L.eye;
+        c.globalAlpha = ea; c.fillStyle = this.lk && this.lk.eye ? this.lk.eye : inkStyle ? '#f4f1e8' : L.eye;
+        if (this.lk && this.lk.paleNight) c.globalCompositeOperation = 'source-over';      // a pale fog: eyes are dark marks, not lights
         const er = z.r > 25 ? 3.4 : z.type === 'wyrm' ? 2.8 : z.type === 'screamer' ? 2.2 : 1.6;
         c.beginPath(); c.arc(hx - sa * e, hy + ca * e, er, 0, TAU); c.arc(hx + sa * e, hy - ca * e, er, 0, TAU); c.fill();
       }
+      c.globalCompositeOperation = 'lighter';
       for (const f of this.flashes) this.glow(c, f.x, f.y, f.r * 0.5, 0.55 * (f.life / f.max), f.c);
       for (const p of sim.players) {
         if (p.away || p.down || p.flash <= 0) continue;
@@ -2211,10 +2393,13 @@
         else if (s.id === 'tesla') { c.globalAlpha = 0.5 + 0.3 * Math.sin(this.time * 9 + s.uid); c.fillStyle = '#9fe0ff'; c.beginPath(); c.arc(s.x, s.y, s.flash > 0 ? 9 : 4.5, 0, TAU); c.fill(); }
       }
       c.globalAlpha = 1;
+      // a style can redraw the game's rings and lightning in its own ink (fxInk), dashed (fxDash), and as marks rather than light (fxOver)
+      const fxInk = this.lk && this.lk.fxInk, fxOver = !!(this.lk && this.lk.fxOver);
+      if (fxOver) c.globalCompositeOperation = 'source-over';
       for (const a of this.arcs) {
         const t = a.life / a.max;
         for (let pass = 0; pass < 2; pass++) {
-          c.strokeStyle = pass ? `rgba(255,255,255,${t})` : `rgba(${a.c || '90,170,255'},${t * 0.6})`;
+          c.strokeStyle = fxInk ? `rgba(${fxInk},${pass ? t : t * 0.35})` : pass ? `rgba(255,255,255,${t})` : `rgba(${a.c || '90,170,255'},${t * 0.6})`;
           c.lineWidth = pass ? 2 : 7;
           c.beginPath();
           a.segs.forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)));
@@ -2223,9 +2408,11 @@
       }
       for (const r of this.rings) {
         const t = r.life / r.max;
-        c.strokeStyle = `rgba(${r.c},${t * 0.8})`; c.lineWidth = 2 + 8 * t;
+        c.strokeStyle = `rgba(${fxInk || r.c},${t * 0.8})`; c.lineWidth = fxInk ? 1.5 + 3 * t : 2 + 8 * t;
+        if (this.lk && this.lk.fxDash) c.setLineDash(this.lk.fxDash);
         c.beginPath(); c.arc(r.x, r.y, r.r * (1 - t * 0.75), 0, TAU); c.stroke();
       }
+      c.setLineDash([]);
       c.globalCompositeOperation = 'source-over';
 
       // weak points: walls touching only at a corner leave a diagonal gap zombies claw through (clearest by day)
@@ -2362,7 +2549,7 @@
       for (const t of this.texts) {
         const a = clamp(t.life / t.max * 2, 0, 1);
         c.globalAlpha = a;
-        c.font = t.big ? 'bold 30px "Segoe UI", sans-serif' : 'bold 17px "Segoe UI", sans-serif';
+        c.font = (t.big ? 'bold 30px ' : 'bold 17px ') + ((this.lk && this.lk.hudFont) || '"Segoe UI", sans-serif');
         c.fillStyle = '#000'; c.fillText(t.text, t.x + 2, t.y + 2);
         c.fillStyle = t.color; c.fillText(t.text, t.x, t.y);
       }
@@ -2430,7 +2617,13 @@
 
     drawHud(c, sim, ui) {
       if (sim.phase === 'lobby') return;
-      const font = (px, w) => { c.font = `${w || 'bold'} ${px}px "Segoe UI", "Trebuchet MS", sans-serif`; };
+      const hf = (this.lk && this.lk.hudFont) || '"Segoe UI", "Trebuchet MS", sans-serif';
+      const font = (px, w) => { c.font = `${w || 'bold'} ${px}px ${hf}`; };
+      if (this.lk && this.lk.hudPlate) {           // pale styles: the status text needs something dark behind it
+        c.save(); c.translate(W / 2, 0); c.scale(1, 0.2);
+        const pg = c.createRadialGradient(0, 0, 0, 0, 0, 640); pg.addColorStop(0, 'rgba(38,34,32,0.6)'); pg.addColorStop(0.6, 'rgba(38,34,32,0.36)'); pg.addColorStop(1, 'rgba(38,34,32,0)');
+        c.fillStyle = pg; c.beginPath(); c.arc(0, 0, 640, 0, Math.PI * 2); c.fill(); c.restore();
+      }
       const text = (s, x, y, col) => { c.fillStyle = 'rgba(0,0,0,0.8)'; c.fillText(s, x + 2, y + 2); c.fillStyle = col; c.fillText(s, x, y); };
       // incoming-direction warnings
       const fc = sim.forecast;
@@ -2504,7 +2697,7 @@
         const h = b.detail ? 190 : 150;
         c.globalAlpha = a; c.textAlign = 'center';
         c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(0, 300, W, h);
-        c.font = '900 84px Impact, "Arial Black", sans-serif';
+        c.font = (this.lk && this.lk.titleFont) ? this.lk.titleFont.replace('PX', '84') : '900 84px Impact, "Arial Black", sans-serif';
         const grow = b.slow ? 1 + 0.04 * clamp(el / b.max, 0, 1) : 1;      // the title creeps closer
         c.save(); c.translate(W / 2, 385); c.scale(grow, grow); text(b.text, 0, 0, b.color); c.restore();
         // the sub line and details arrive a beat after the title
@@ -2521,5 +2714,7 @@
     }
   }
 
+  Renderer.STYLES = STYLES; Renderer.setTheme = setTheme; Renderer.LOOKS = Renderer.LOOKS || {};
+  Renderer.int = { GUNLOOK, ZLOOK };
   root.Renderer = Renderer;
 })(window);

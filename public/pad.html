@@ -224,6 +224,7 @@
   #rotate div { font-size: 60px; }
   @media (orientation: portrait) { body.playing #rotate { display: flex; } }
 </style>
+<link rel="stylesheet" href="/looks.css">
 </head>
 <body class="gameview">
 <canvas id="view"></canvas>
@@ -306,8 +307,8 @@
         <button data-mode="game">Game on my phone<small>play looking at this screen</small></button>
         <button data-mode="classic">Controller only<small>watch the big screen</small></button>
       </div>
-      <h3>BLOOD &amp; GORE</h3>
-      <div class="seg" id="goreSeg"><button data-gore="2">Full</button><button data-gore="1">Reduced</button><button data-gore="0">Off</button></div>
+      <h3>GRAPHICS</h3>
+      <div class="seg"><button id="gfxOpen">Look, gore and sharpness<small>choose how the game is drawn on this phone</small></button></div>
       <h3>PHONE SOUND</h3>
       <div class="seg" id="gearSound"><button data-snd="1">On</button><button data-snd="0">Off</button></div>
       <h3>MUSIC</h3>
@@ -329,6 +330,7 @@
       <div class="seg" id="speedSeg"><button data-spd="1">Speed 1×</button><button data-spd="2">2×</button><button data-spd="3">3×</button><button data-spd="5">5×</button><button data-spd="10">10×</button></div>
       <div class="seg"><button id="fsBtn">Fullscreen</button><button id="gearClose" class="on">Back to game</button></div>
     </div>
+    <div class="cover" id="gfxCover" style="z-index:27;justify-content:flex-start;overflow-y:auto;touch-action:pan-y"><div id="gfxBody"></div></div>
     <div class="cover" id="pauseCover">
       <h2>PAUSED</h2>
       <div class="shop"><div class="shop-body" id="pauseIntel"></div></div>
@@ -345,6 +347,14 @@
 <script src="/js/sim.js"></script>
 <script src="/js/audio.js"></script>
 <script src="/js/render.js"></script>
+<script src="/js/look-charcoal.js"></script>
+<script src="/js/look-woodcut.js"></script>
+<script src="/js/look-watercolour.js"></script>
+<script src="/js/look-glass.js"></script>
+<script src="/js/look-stitch.js"></script>
+<script src="/js/look-puppet.js"></script>
+<script src="/js/look-kid.js"></script>
+<script src="/js/gfxmenu.js"></script>
 <script src="/js/netview.js"></script>
 <script src="/js/shopui.js"></script>
 <script>
@@ -813,10 +823,9 @@
   $('gearClose').addEventListener('click', () => { gearOpen = false; refresh(); });
   $('fsBtn').addEventListener('click', fullscreen);
   $('gPause').addEventListener('click', () => { gearOpen = false; act('pause', 1); refresh(); });
-  const goreNow = () => { const g = store.get('le_gore'); return g === null || g === '' ? 2 : +g; };
-  const goreBtns = () => document.querySelectorAll('[data-gore]').forEach((b) => b.classList.toggle('on', +b.dataset.gore === goreNow()));
-  document.querySelectorAll('[data-gore]').forEach((b) => b.addEventListener('click', () => { store.set('le_gore', b.dataset.gore); if (R) R.gore = +b.dataset.gore; goreBtns(); }));
-  goreBtns();
+  // Graphics panel: look, gore, sharpness (this phone only)
+  const gfx = window.GfxMenu.build($('gfxBody'), () => R, () => $('gfxCover').classList.remove('show'));
+  $('gfxOpen').addEventListener('click', () => { gfx.refresh(); $('gfxCover').classList.add('show'); });
   document.querySelectorAll('[data-spd]').forEach((b) => b.addEventListener('click', () => act('speed', +b.dataset.spd)));
   $('pResume').addEventListener('click', () => act('pause', 0));
   // quitting ends the run for everyone, so it takes two taps

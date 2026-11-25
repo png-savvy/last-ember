@@ -101,6 +101,22 @@ to lay a whole line.
 - **Bunker Wall** ($380, 3000 hp): three times tougher than Steel, slightly more per hp because it packs it into one cell.
 - There is no Repair tool: everything is repaired for free at dawn.
 
+## Graphics
+
+Each device has its own settings: **Graphics** button on the big screen (waiting room and pause menu), or
+**MENU -> Graphics** on a phone. Pick a look from the picture cards; gore and sharpness are there too.
+- **Classic**: the painted look.
+- **Charcoal and ember**: a charcoal drawing where only fire, muzzle flash and blood keep their colour.
+- **Woodcut print**: black ink cut with bone-white lines; light is rays carved out of the dark; red only for blood and eyes.
+- **Stained glass**: a cathedral window of leaded panes in jewel colours; the campfire is a gold sun; damage cracks the glass.
+- **Cross-stitch sampler**: the whole game embroidered on linen, one X of thread per stitch; every kill leaves a loose red thread on the cloth.
+- **Shadow puppet theatre**: a lamp behind a cloth screen; everything is a black cut-out with punched holes, and shadows far from the lamp grow huge and soft.
+- **A child drew this**: wax crayon stick figures on lined paper; the page is redrawn each dawn with a tally of nights and gets darker as the run goes on.
+- **Bleeding watercolour**: pale washes and pencil on rough paper; night is a white fog; blood is the one strong pigment.
+
+A look restyles the menus and the HUD lettering too, and (with **Sound follows the look** on) switches the music and
+gun-sound styles to suit it. Going back to Classic restores the sound styles you had chosen yourself.
+
 ## Sound
 
 Audio button (big screen) or the gear menu (phone): volumes, plus a choice of **gun sounds** (Realistic, Arcade
